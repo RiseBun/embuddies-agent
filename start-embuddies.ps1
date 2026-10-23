@@ -1,5 +1,12 @@
 param([switch]$Development, [switch]$VerifyOnly)
 $ErrorActionPreference = 'Stop'
+trap {
+    $launchLog = Join-Path $env:LOCALAPPDATA 'embuddies\logs\startup.log'
+    [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($launchLog)) | Out-Null
+    [IO.File]::AppendAllText($launchLog, ([DateTime]::Now.ToString('s') + ' ' + $_.Exception.Message + [Environment]::NewLine))
+    [Console]::Error.WriteLine($_.Exception.Message)
+    exit 1
+}
 $electron = Join-Path $PSScriptRoot 'desktop\node_modules\electron\dist\electron.exe'
 if (-not (Test-Path -LiteralPath $electron)) { throw 'Install the locked desktop dependencies first.' }
 if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'frontend\dist\index.html'))) { throw 'Build the React frontend before starting.' }

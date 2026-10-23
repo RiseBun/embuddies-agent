@@ -24,7 +24,10 @@ class Boundary extends Component<{ children: ReactNode }, { error: string }> {
   }
 }
 const pet = window.EMBUDDIES_DESKTOP?.args.includes("--embuddies-kind=pet");
-if (pet) document.body.classList.add("pet-window");
+if (pet) {
+  document.documentElement.classList.add("pet-window");
+  document.body.classList.add("pet-window");
+}
 createRoot(document.getElementById("root")!).render(
   <Boundary>{pet ? <Pet /> : <Workbench />}</Boundary>,
 );

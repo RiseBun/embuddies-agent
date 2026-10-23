@@ -175,7 +175,7 @@ button svg {
   color: #22c6bb;
   flex-shrink: 0;
 }
-.brand.animated .eyes {
+.brand.animated:not(.interactive) .eyes {
   transform-box: fill-box;
   transform-origin: center;
   animation: blink 6s infinite;
@@ -336,8 +336,11 @@ button svg {
 .fatal p {
   margin: 20px 0;
 }
-.pet-window {
+html.pet-window,
+body.pet-window,
+.pet-window #root {
   background: transparent;
+  color-scheme: light;
 }
 .pet-root {
   height: 100%;
@@ -352,6 +355,11 @@ button svg {
   touch-action: none;
   cursor: default;
   padding: 20px;
+}
+.pet-body .brand {
+  display: block;
+  overflow: visible;
+  pointer-events: none;
 }
 .pet-menu {
   position: absolute;

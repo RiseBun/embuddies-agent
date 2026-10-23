@@ -4,13 +4,13 @@ Windows 组合式 Agent 工作台。Electron 提供桌面窗口、原生文件�
 
 ## 本机启动
 
-日常使用双击 `启动embuddies.cmd`，运行当前源码及已构建的前端，固定读取 `%LOCALAPPDATA%\embuddies\data`。同名 PowerShell 入口与 VBS 入口使用同一启动脚本。修改前端后需重新构建。这个入口包含本次可靠性修复；旧的候选包需要重新打包才会包含这些修复。
+日常双击桌面或源码目录的 `embuddies` 快捷方式，也可双击 `start-embuddies.vbs`，启动时不显示终端。运行 `install-shortcuts.ps1` 可创建或修复桌面、源码目录和候选版快捷方式；它们使用统一的透明品牌图标。固定读取 `%LOCALAPPDATA%\embuddies\data`。`启动embuddies.cmd` 保留为显示错误的诊断入口，直接双击 CMD 文件会出现终端；日常使用上述快捷方式。修改前端后需重新构建，旧的候选包需重新打包才能包含修复。启动失败显示提示并写入 `%LOCALAPPDATA%\embuddies\logs\startup.log`。
 
 开发隔离测试使用 `start-development.ps1`，数据位于 `%LOCALAPPDATA%\embuddies-development\data`。不同数据目录各自保留历史，不会自动合并。
 
 ## 本机候选版
 
-双击 `启动候选embuddies.cmd`。它打开 `native-engine/desktop-candidate.json` 指定的独立候选包，试用记录保存在 `%LOCALAPPDATA%\embuddies-candidate\data`，浏览器和加密配置使用独立 profile。首次使用在输入框旁配置 gc 或 Responses 兼容渠道并测试连接。
+双击源码目录的 `embuddies 候选版` 快捷方式，或使用 `wscript start-embuddies.vbs /candidate`。它打开 `native-engine/desktop-candidate.json` 指定的独立候选包，试用记录保存在 `%LOCALAPPDATA%\embuddies-candidate\data`，浏览器和加密配置使用独立 profile。`启动候选embuddies.cmd` 保留为诊断入口。首次使用在输入框旁配置 gc 或 Responses 兼容渠道并测试连接。
 
 候选 exe、安装程序和便携 ZIP 位于 `E:/embuddies-build/desktop/candidates/<版本>-<候选 ID>/`。便携版解压后直接打开 `windows/embuddies.exe`；安装版使用独立候选安装身份，不覆盖原有正式安装。原数据与原正式包保持不变。候选试用入口使用数据副本；候选 exe 默认也使用 `%LOCALAPPDATA%\embuddies-candidate\data` 与独立 profile，不会触发原软件的单实例锁。正式版本仍使用 `%LOCALAPPDATA%\embuddies\data`，升级前须保留备份。
 
@@ -73,11 +73,14 @@ npm run verify:ui --prefix runtime
 npm run verify:desktop-recovery --prefix runtime
 npm run verify:branding --prefix runtime
 npm run verify:web-form --prefix runtime
+node runtime/scripts/verify-desktop-pet.mjs
 $env:EMBUDDIES_NATIVE_EXECUTABLE = '<已编译的 embuddies-runtime.exe>'
 npm run verify:native-runtime --prefix runtime
 ```
 
 `verify:native-runtime` 覆盖原生工具、资源分支、认证失败、取消、子 Agent、会话恢复及压缩。Rust 检查遵循源码仓库的 `just test`、`just fmt` 和 `just fix` 要求。
+
+`verify-desktop-pet.mjs` 使用隔离数据验证真实 Electron 窗口的透明像素、呼吸眨眼、鼠标坐标、减少动态效果偏好、拖动及双击打开工作台。报告和截图保存在 `.tmp/pet-verification/`；设置 `EMBUDDIES_TEST_CANDIDATE` 为候选包的 `windows` 目录可验证打包版本。
 
 ## 构建候选与验收
 

@@ -28,7 +28,8 @@ OutputBaseFilename=embuddies-Windows-Setup-{#MyAppVersion}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-UninstallDisplayIcon={app}\{#MyAppExeName}
+UninstallDisplayIcon={app}\resources\app\shell\resources\icons\appIcon.ico
+SetupIconFile={#StageRoot}\resources\app\shell\resources\icons\appIcon.ico
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 CloseApplications=yes
@@ -42,8 +43,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Source: "{#StageRoot}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\embuddies"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\embuddies"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{group}\embuddies"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\resources\app\shell\resources\icons\appIcon.ico"; AppUserModelID: "com.embuddies.app"
+Name: "{autodesktop}\embuddies"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\resources\app\shell\resources\icons\appIcon.ico"; AppUserModelID: "com.embuddies.app"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked

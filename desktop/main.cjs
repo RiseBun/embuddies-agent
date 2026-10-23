@@ -26,9 +26,7 @@ const distributionPath = path.join(bundleRoot, "distribution.json");
 const distribution = fs.existsSync(distributionPath)
   ? // Strip a UTF-8 BOM: JSON.parse rejects it and a packaged build must not
     // fail to start because of a file encoding artifact.
-    JSON.parse(
-      fs.readFileSync(distributionPath, "utf8").replace(/^\uFEFF/, ""),
-    )
+    JSON.parse(fs.readFileSync(distributionPath, "utf8").replace(/^\uFEFF/, ""))
   : { channel: "development" };
 const namespace =
   distribution.channel === "candidate" ? "embuddies-candidate" : "embuddies";
@@ -260,7 +258,10 @@ function createWindow(kind) {
     y: isPanel ? undefined : Math.round(workArea.y + workArea.height - 280),
     center: isPanel,
     title: isPanel ? "embuddies" : "embuddies",
-    icon: path.join(iconRoot, "appIcon.png"),
+    icon: path.join(
+      iconRoot,
+      process.platform === "win32" ? "appIcon.ico" : "appIcon.png",
+    ),
     frame: false,
     transparent: !isPanel,
     backgroundColor: isPanel ? "#ffffff" : "#00000000",
@@ -386,6 +387,16 @@ ipcMain.handle("embuddies:host", async (event, method, values) => {
   const args = Array.isArray(values) ? values : [];
   const scale = displayScale(win);
   switch (method) {
+    case "window.getPointer": {
+      const cursor = screen.getCursorScreenPoint();
+      const bounds = win.getBounds();
+      return {
+        x: cursor.x - bounds.x,
+        y: cursor.y - bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+      };
+    }
     case "browser.command":
       return browserRuntime.command(args[0]);
     case "browser.present":

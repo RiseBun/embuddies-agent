@@ -26,10 +26,7 @@ while (pending.length) {
   await fs.mkdir(path.dirname(output), { recursive: true });
   await fs.copyFile(file, output);
 }
-for (const forbidden of [
-  "codex-runtime.mjs",
-  "codex-app-server-client.mjs",
-])
+for (const forbidden of ["codex-runtime.mjs", "codex-app-server-client.mjs"])
   if (included.has(forbidden))
     throw Error("Obsolete execution loop reached production: " + forbidden);
 if (!included.has("embuddies-runtime.mjs"))
@@ -37,6 +34,10 @@ if (!included.has("embuddies-runtime.mjs"))
 await fs.copyFile(
   path.join(source, "native-models.json"),
   path.join(target, "native-models.json"),
+);
+await fs.copyFile(
+  path.join(source, "immutable-core.json"),
+  path.join(target, "immutable-core.json"),
 );
 await fs.cp(
   path.join(source, "starter-skills"),

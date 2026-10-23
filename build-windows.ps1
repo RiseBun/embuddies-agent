@@ -39,6 +39,8 @@ $stage=Join-Path $candidateRoot 'windows'
 New-Item -ItemType Directory -Path $stage -Force|Out-Null
 Get-ChildItem -LiteralPath $electronRoot|Copy-Item -Destination $stage -Recurse -Force
 Rename-Item -LiteralPath (Join-Path $stage 'electron.exe') -NewName 'embuddies.exe'
+if (-not ('EmbuddiesIconResources' -as [type])) { Add-Type -Path (Join-Path $projectRoot 'launcher\IconResources.cs') }
+[EmbuddiesIconResources]::SetIcon((Join-Path $stage 'embuddies.exe'), (Join-Path $projectRoot 'shell\resources\icons\appIcon.ico'))
 function Assert-ExecutableIntegrity([string]$file){
   $acl=& icacls.exe $file
   if($LASTEXITCODE -ne 0){throw 'Unable to inspect executable integrity label.'}
