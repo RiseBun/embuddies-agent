@@ -7,6 +7,11 @@ import { EmbuddiesEventStream } from "./events/event-stream.mjs";
 import { EmbuddiesBrowser } from "./browser-runtime.mjs";
 import { resolveModelTransport } from "./model-providers/registry.mjs";
 import {
+  responsesRequest,
+  responsesResult,
+  readResponsesStream,
+} from "./model-providers/openai-responses.mjs";
+import {
   assertToolPermission,
   toolRequiresWrite,
 } from "./permissions/policy.mjs";
@@ -555,6 +560,7 @@ export class EmbuddiesRuntime {
   ) {
     const transport = resolveModelTransport(channel);
     const isAnthropic = transport.protocol === "anthropic";
+    const isResponses = transport.protocol === "responses";
     const endpoint = transport.endpoint;
     const streaming = Boolean(onDelta);
     const headers = { "content-type": "application/json" };
@@ -565,25 +571,27 @@ export class EmbuddiesRuntime {
 
     const system =
       messages.find((item) => item.role === "system")?.content || "";
-    const body = isAnthropic
-      ? {
-          model: transport.model,
-          max_tokens: 32_768,
-          system,
-          messages: toAnthropicMessages(messages),
-          tools: tools.map((item) => ({
-            name: item.function.name,
-            description: item.function.description,
-            input_schema: item.function.parameters,
-          })),
-          ...(streaming ? { stream: true } : {}),
-        }
-      : {
-          model: transport.model,
-          messages,
-          ...(tools.length ? { tools } : {}),
-          stream: streaming,
-        };
+    const body = isResponses
+      ? responsesRequest(transport.model, messages, tools, streaming)
+      : isAnthropic
+        ? {
+            model: transport.model,
+            max_tokens: 32_768,
+            system,
+            messages: toAnthropicMessages(messages),
+            tools: tools.map((item) => ({
+              name: item.function.name,
+              description: item.function.description,
+              input_schema: item.function.parameters,
+            })),
+            ...(streaming ? { stream: true } : {}),
+          }
+        : {
+            model: transport.model,
+            messages,
+            ...(tools.length ? { tools } : {}),
+            stream: streaming,
+          };
 
     let response;
     for (let attempt = 0; attempt < (allowRetry ? 2 : 1); attempt += 1) {
@@ -642,6 +650,8 @@ export class EmbuddiesRuntime {
       );
     if (eventStream) {
       try {
+        if (isResponses)
+          return await readResponsesStream(readSSE(response), onDelta);
         return isAnthropic
           ? await readAnthropicStream(response, onDelta)
           : await readOpenAIStream(response, onDelta);
@@ -666,6 +676,7 @@ export class EmbuddiesRuntime {
       parsed = raw.includes("data:") ? parseEventStream(raw) : null;
     }
     if (!parsed) throw new Error("模型服务返回了无效内容，请检查模型渠道");
+    if (isResponses) return responsesResult(parsed);
     if (isAnthropic) {
       const text = (parsed?.content || [])
         .filter((item) => item.type === "text")
@@ -976,6 +987,7 @@ export class EmbuddiesRuntime {
         const assistant = {
           role: "assistant",
           content: result.text || null,
+          ...(result.output ? { responsesOutput: result.output } : {}),
           tool_calls: result.calls.map((call) => ({
             id: call.id,
             type: "function",

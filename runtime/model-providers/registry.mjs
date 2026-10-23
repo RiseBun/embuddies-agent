@@ -1,7 +1,7 @@
 const transports = new Map([
   ["anthropic-messages", { protocol: "anthropic", path: "/v1/messages" }],
   ["openai-completions", { protocol: "openai", path: "/chat/completions" }],
-  ["openai-responses", { protocol: "openai", path: "/responses" }],
+  ["openai-responses", { protocol: "responses", path: "/responses" }],
 ]);
 
 export function resolveModelTransport(channel = {}) {
