@@ -1,0 +1,9 @@
+embuddies native runtime incorporates OpenAI Codex source code.
+Upstream: https://github.com/openai/codex
+Baseline: aa380897f67b91e1a47d530d7286d497b6726d3f
+License: Apache License, Version 2.0 (see LICENSE in the native runtime bundle).
+
+embuddies modifications include an independent runtime entry and profile,
+standard Responses model configuration, desktop integration, workspace resource
+composition and an embuddies user interface. Original authorship and necessary
+internal protocol names are retained.

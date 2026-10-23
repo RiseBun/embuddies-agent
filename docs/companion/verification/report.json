@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "environment": "local Windows; headless Microsoft Edge; isolated browser profile",
+  "scope": "standalone interaction prototype only",
+  "checks": [
+    "demo toolbar and skip button are absent; typed skip/direct chat exits onboarding without storing a name, and survives reload",
+    "candidate confirmation and explicit interaction preference",
+    "confirmed memories survive reload and feed reunion",
+    "correction replaces old value; forgotten goal stays forgotten after reload; Escape and blank click dismiss",
+    "pause new memory and disable existing memory independently",
+    "quiet mode and persisted daily pause suppress suggestions, without hiding task notices",
+    "task intent interrupts onboarding without becoming a personal memory",
+    "768 / 390 / 320 px layouts and drawers have no horizontal overflow",
+    "startup jump is visible, settles without layout shift; click replays; reduced motion cancels and suppresses animation; opening copy has one sentence",
+    "storage failure keeps candidate pending and never claims saved"
+  ],
+  "pageErrors": [],
+  "networkRequests": []
+}

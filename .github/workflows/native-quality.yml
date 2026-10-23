@@ -1,0 +1,70 @@
+name: native-quality
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  candidate:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            runtime/package-lock.json
+            frontend/package-lock.json
+            desktop/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just,cargo-nextest
+      - run: npm ci --prefix runtime
+      - run: npm ci --prefix frontend
+      - run: npm ci --prefix desktop
+      - run: ./prepare-native-source.ps1
+      - shell: pwsh
+        run: |
+          $toolRoot=Join-Path $env:RUNNER_TEMP 'embuddies-build'
+          ./build-native-engine.ps1 -ToolRoot $toolRoot
+          $native=Get-ChildItem native-engine/candidates -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          Add-Content $env:GITHUB_ENV "EMBUDDIES_NATIVE_EXECUTABLE=$($native.FullName)/embuddies-runtime.exe"
+          Add-Content $env:GITHUB_ENV "EMBUDDIES_NATIVE_CANDIDATE=$($native.FullName)"
+          Add-Content $env:GITHUB_ENV "CARGO_TARGET_DIR=$toolRoot/target"
+          Add-Content $env:GITHUB_ENV "EMBUDDIES_VERIFY_DIRECTORY=$env:RUNNER_TEMP/verification"
+      - run: just -f embuddies-core/justfile test -p codex-app-server --lib
+      - run: just -f embuddies-core/justfile test -p codex-app-server --test embuddies_entry
+      - run: npm run lint --prefix runtime
+      - run: npm run format:check --prefix runtime
+      - run: npm run coverage --prefix runtime
+      - run: npm run verify:ui --prefix runtime
+      - run: npm run verify:branding --prefix runtime
+      - run: npm run verify:web-form --prefix runtime
+      - run: npm run verify:native-runtime --prefix runtime
+      - shell: pwsh
+        run: |
+          $buildRoot=Join-Path $env:RUNNER_TEMP 'desktop-build'
+          ./build-windows.ps1 -SkipArchive -SkipInstaller -BuildRoot $buildRoot -NativeCandidate $env:EMBUDDIES_NATIVE_CANDIDATE
+          $candidate=Get-ChildItem "$buildRoot/candidates" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          Add-Content $env:GITHUB_ENV "EMBUDDIES_TEST_CANDIDATE=$($candidate.FullName)/windows"
+          Add-Content $env:GITHUB_ENV "EMBUDDIES_ARTIFACT_DIR=$env:RUNNER_TEMP/desktop-acceptance"
+          Add-Content $env:GITHUB_ENV 'EMBUDDIES_TEST_FAULTS=1'
+          Add-Content $env:GITHUB_ENV 'EMBUDDIES_TEST_PERMISSIONS=1'
+      - run: npm run verify:windows-bundle --prefix runtime
+      - run: npm run verify:native-desktop --prefix runtime
+      - run: git diff --check
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: embuddies-candidate-evidence
+          path: |
+            ${{ runner.temp }}/desktop-acceptance
+            ${{ runner.temp }}/desktop-build/candidates/*/integrity-report.json
+            .tmp/native-baseline-report.json

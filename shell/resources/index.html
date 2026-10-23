@@ -1,0 +1,987 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:31337 ws://127.0.0.1:*"
+    />
+    <title>embuddies</title>
+    <link rel="icon" href="/icons/appIcon.png" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main id="appShell" data-agent-state="starting">
+      <section id="pet" aria-label="embuddies，左键拖动，右键打开菜单">
+        <svg
+          class="embuddiesSvg"
+          viewBox="35 18 250 224"
+          role="img"
+          aria-label="embuddies"
+        >
+          <g id="bodyShape">
+            <path
+              fill="#22D6D0"
+              fill-rule="evenodd"
+              d="M158 29 C224 28 271 69 272 126 C273 184 226 226 161 229 C96 230 48 188 48 130 C47 72 93 32 158 29 Z M158 37 C99 40 56 76 56 130 C56 180 102 216 161 216 C220 213 264 177 264 126 C263 75 218 36 158 37 Z"
+            />
+          </g>
+          <g fill="#22D6D0">
+            <ellipse id="leftEye" cx="126" cy="128" rx="25" ry="25" />
+            <ellipse id="rightEye" cx="194" cy="128" rx="25" ry="25" />
+          </g>
+        </svg>
+      </section>
+
+      <nav
+        id="contextMenu"
+        class="contextMenu"
+        aria-label="embuddies菜单"
+        hidden
+      >
+        <button id="openSettings" type="button">设置</button>
+        <button id="hidePet" type="button">隐藏embuddies</button>
+        <button id="exitPet" class="dangerAction" type="button">
+          退出应用
+        </button>
+      </nav>
+
+      <section id="interface" aria-label="embuddies应用界面">
+        <header id="panelDragRegion" class="panelHeader">
+          <div class="brandBlock">
+            <button
+              id="toggleSidebar"
+              class="iconButton sidebarToggle"
+              type="button"
+              aria-label="工作区"
+              aria-expanded="false"
+              aria-controls="historySidebar"
+              title="工作区"
+            >
+              <span data-icon="menu" aria-hidden="true"></span>
+            </button>
+            <span class="eyebrow">EMBUDDIES</span>
+            <h1>
+              embuddies <span class="brandMark" aria-hidden="true">°</span>
+            </h1>
+          </div>
+          <div class="workspaceHeadline" aria-live="polite">
+            <strong id="headerWorkspaceName">开始一个任务</strong>
+            <span id="headerWorkspacePath">选择工作区或打开项目</span>
+          </div>
+          <div class="runtimeSignal" aria-live="polite">
+            <span id="statusDot" class="statusDot" aria-hidden="true"></span>
+            <span id="statusText">启动中</span>
+          </div>
+          <div id="windowActions" class="windowActions">
+            <button
+              id="openResourceLibrary"
+              class="iconButton"
+              type="button"
+              aria-label="打开资源库"
+              aria-expanded="false"
+              aria-controls="resourceShelf"
+              title="资源库"
+            >
+              <span data-icon="library" aria-hidden="true"></span>
+            </button>
+            <button
+              id="globalSettingsButton"
+              class="iconButton"
+              type="button"
+              aria-label="全局设置"
+              title="全局设置"
+            >
+              <span data-icon="settings" aria-hidden="true"></span>
+            </button>
+            <button
+              id="collapsePanel"
+              class="iconButton"
+              type="button"
+              aria-label="收起到悬浮球"
+              title="收起到悬浮球"
+            >
+              <span data-icon="minimize" aria-hidden="true"></span>
+            </button>
+            <button
+              id="maximizePanel"
+              class="iconButton maximizeButton"
+              type="button"
+              aria-label="最大化窗口"
+              title="最大化窗口"
+            >
+              <span data-icon="maximize" aria-hidden="true"></span>
+            </button>
+            <button
+              id="closeApp"
+              class="iconButton closeButton"
+              type="button"
+              aria-label="关闭应用"
+              title="关闭应用"
+            >
+              <span data-icon="close" aria-hidden="true"></span>
+            </button>
+          </div>
+        </header>
+
+        <div id="resourceDrawerBackdrop" class="drawerBackdrop" hidden></div>
+        <section
+          id="resourceShelf"
+          class="resourceShelf"
+          aria-label="资源库"
+          aria-modal="true"
+          role="dialog"
+          data-expanded="false"
+          hidden
+        >
+          <div class="resourceShelfHeader">
+            <div class="resourceShelfTitle">
+              <span
+                class="drawerIcon"
+                data-icon="library"
+                aria-hidden="true"
+              ></span>
+              <span
+                ><strong>资源库</strong
+                ><small>为当前工作区添加上下文与能力</small></span
+              >
+            </div>
+            <div class="resourceShelfActions">
+              <label class="historySearch">
+                <span data-icon="search" aria-hidden="true"></span>
+                <input
+                  id="historySearchInput"
+                  type="search"
+                  autocomplete="off"
+                  placeholder="搜索资源"
+                  aria-label="搜索资源"
+                />
+                <kbd>Ctrl K</kbd>
+              </label>
+              <button
+                id="showAllResources"
+                class="textButton"
+                type="button"
+                aria-expanded="true"
+                hidden
+              >
+                显示全部
+              </button>
+              <button
+                id="resourceAddButton"
+                class="addButton"
+                type="button"
+                aria-label="新建资源"
+                aria-expanded="false"
+                aria-controls="resourceMenu"
+                title="新建资源"
+              >
+                <span data-icon="plus" aria-hidden="true"></span>
+              </button>
+              <button
+                id="closeResourceLibrary"
+                class="iconButton"
+                type="button"
+                aria-label="关闭资源库"
+                title="关闭资源库"
+              >
+                <span data-icon="close" aria-hidden="true"></span>
+              </button>
+            </div>
+          </div>
+          <div id="resourceMenu" class="newMenu resourceMenu" hidden>
+            <button id="newSkill" type="button">
+              <strong>Skill</strong>
+            </button>
+            <button id="newAgent" type="button">
+              <strong>Agent</strong>
+            </button>
+            <button id="newPlugin" type="button">
+              <strong>插件</strong>
+            </button>
+          </div>
+          <div id="resourceShelfBody" class="resourceShelfBody">
+            <div id="resourceShelfList" class="resourceShelfList"></div>
+          </div>
+          <div
+            id="resourceShelfResize"
+            class="layoutResize layoutResizeHorizontal"
+            role="separator"
+            aria-label="调整资源区高度"
+            aria-orientation="horizontal"
+            tabindex="0"
+          ></div>
+        </section>
+
+        <div class="panelBody">
+          <aside id="historySidebar" class="historySidebar" aria-label="工作区">
+            <div class="historyHeader">
+              <div><strong>工作区</strong></div>
+              <button
+                id="workspaceAddButton"
+                class="addButton"
+                type="button"
+                aria-label="新建工作区"
+                title="新建工作区"
+              >
+                <span data-icon="plus" aria-hidden="true"></span>
+              </button>
+            </div>
+            <button
+              id="navResourceLibrary"
+              class="navLibraryButton"
+              type="button"
+            >
+              <span data-icon="library" aria-hidden="true"></span>
+              <span>资源库</span>
+              <small>浏览与挂载能力</small>
+            </button>
+            <div id="historyList" class="historyList"></div>
+            <div
+              id="workspaceResize"
+              class="layoutResize layoutResizeVertical"
+              role="separator"
+              aria-label="调整工作区宽度"
+              aria-orientation="vertical"
+              tabindex="0"
+            ></div>
+          </aside>
+
+          <div id="sidebarBackdrop" class="sidebarBackdrop" hidden></div>
+          <section id="chatView" class="chatView" aria-label="对话">
+            <header id="workspaceStage" class="workspaceStage">
+              <div class="workspaceStageMain">
+                <span
+                  class="workspaceStageIcon"
+                  data-icon="workspace"
+                  aria-hidden="true"
+                ></span>
+                <span
+                  ><strong id="stageWorkspaceName">尚未选择工作区</strong
+                  ><small id="stageWorkspacePath"
+                    >创建工作区或打开项目后即可开始</small
+                  ></span
+                >
+              </div>
+              <div class="workspaceStageMeta">
+                <button
+                  id="stageResourceCount"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="workspaceComposition"
+                  title="查看工作区组合"
+                >
+                  0 个资源
+                </button>
+                <span id="stageRunState" class="stageRunState">空闲</span>
+              </div>
+            </header>
+            <section
+              id="workspaceComposition"
+              class="workspaceComposition"
+              aria-label="工作区组合"
+              hidden
+            >
+              <div class="compositionHeader">
+                <strong>工作区组合</strong>
+                <button
+                  id="compositionClose"
+                  type="button"
+                  aria-label="关闭工作区组合"
+                  title="关闭"
+                >
+                  <span data-icon="close" aria-hidden="true"></span>
+                </button>
+              </div>
+              <div id="compositionList" class="compositionList"></div>
+            </section>
+            <div id="messages" class="messages" aria-live="polite">
+              <div class="emptyMessage">
+                <svg
+                  class="welcomeEmbuddies"
+                  viewBox="35 18 250 224"
+                  role="img"
+                  aria-label="embuddies"
+                >
+                  <path
+                    fill="#22D6D0"
+                    fill-rule="evenodd"
+                    d="M158 29 C224 28 271 69 272 126 C273 184 226 226 161 229 C96 230 48 188 48 130 C47 72 93 32 158 29 Z M158 37 C99 40 56 76 56 130 C56 180 102 216 161 216 C220 213 264 177 264 126 C263 75 218 36 158 37 Z"
+                  />
+                  <ellipse fill="#22D6D0" cx="126" cy="128" rx="25" ry="25" />
+                  <ellipse fill="#22D6D0" cx="194" cy="128" rx="25" ry="25" />
+                </svg>
+                <strong>开始对话</strong>
+                <div class="emptyActions">
+                  <button id="emptyCreateWorkspace" type="button">
+                    新建工作区
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div
+              id="uiNotice"
+              class="uiNotice"
+              role="status"
+              aria-live="polite"
+              hidden
+            ></div>
+            <div id="followUpQueue" class="followUpQueue" hidden>
+              <div class="followUpHeader">
+                <strong>接下来</strong><span id="followUpCount">0 条</span>
+              </div>
+              <div id="followUpList" class="followUpList"></div>
+            </div>
+            <div class="composerDock">
+              <div
+                id="composerResize"
+                class="layoutResize layoutResizeHorizontal"
+                role="separator"
+                aria-label="调整输入区高度"
+                aria-orientation="horizontal"
+                tabindex="0"
+              ></div>
+              <form id="promptForm" class="promptForm">
+                <textarea
+                  id="promptInput"
+                  rows="1"
+                  autocomplete="off"
+                  placeholder="给 embuddies 一个任务…"
+                ></textarea>
+                <div class="composerFooter">
+                  <div class="modeBar">
+                    <button
+                      id="taskOptionsButton"
+                      class="taskOptionsButton"
+                      type="button"
+                      aria-label="任务选项"
+                      title="任务选项"
+                    >
+                      <span data-icon="options" aria-hidden="true"></span
+                      ><span>任务选项</span>
+                    </button>
+                    <div id="taskOptionsPanel" class="taskOptionsPanel" hidden>
+                      <button
+                        id="modelBadge"
+                        class="modelBadge composerModelBadge"
+                        type="button"
+                        title="切换渠道、模型与推理深度"
+                      >
+                        <span id="modelBadgeText">模型</span>
+                      </button>
+                      <select
+                        id="modeInput"
+                        class="quickSelect"
+                        aria-label="任务模式"
+                      >
+                        <option value="act">执行</option>
+                        <option value="plan">计划</option>
+                        <option value="goal">目标</option>
+                      </select>
+                      <button
+                        id="approvalCenterButton"
+                        class="textButton approvalCenterButton"
+                        type="button"
+                        aria-expanded="false"
+                        aria-controls="approvalCenter"
+                      >
+                        审批 <span id="approvalCount">0</span>
+                      </button>
+                      <input
+                        id="goalInput"
+                        class="goalInput"
+                        type="text"
+                        maxlength="2000"
+                        placeholder="输入持续目标"
+                        hidden
+                      />
+                    </div>
+                  </div>
+                  <div class="composerActions">
+                    <button
+                      id="copyConversation"
+                      class="textButton"
+                      type="button"
+                      title="复制对话"
+                    >
+                      复制
+                    </button>
+                    <span class="sendHint">Enter 发送</span>
+                    <button
+                      id="promptStop"
+                      class="stopButton"
+                      type="button"
+                      aria-label="停止当前任务"
+                      title="停止当前任务"
+                      hidden
+                    >
+                      <span data-icon="stop" aria-hidden="true"></span>
+                    </button>
+                    <button
+                      id="promptSubmit"
+                      type="submit"
+                      aria-label="发送任务"
+                    >
+                      <span data-icon="send" aria-hidden="true"></span>
+                    </button>
+                  </div>
+                </div>
+              </form>
+              <aside id="approvalCenter" class="approvalCenter" hidden>
+                <div class="approvalCenterHeader">
+                  <strong>待处理审批</strong
+                  ><button
+                    id="closeApprovalCenter"
+                    type="button"
+                    aria-label="关闭审批"
+                  >
+                    <span data-icon="close" aria-hidden="true"></span>
+                  </button>
+                </div>
+                <div id="approvalCenterList" class="approvalCenterList"></div>
+                <label class="approvalPermission">
+                  <span>项目权限</span>
+                  <select
+                    id="permissionInput"
+                    class="quickSelect"
+                    aria-label="项目权限"
+                  >
+                    <option value="read-only">只读</option>
+                    <option value="workspace-write">工作区写入</option>
+                  </select>
+                </label>
+              </aside>
+              <aside
+                id="modelPopover"
+                class="modelPopover"
+                hidden
+                aria-label="模型设置"
+              >
+                <div class="modelPopoverHeader">
+                  <strong>模型</strong>
+                  <button
+                    id="closeModelPopover"
+                    type="button"
+                    aria-label="关闭模型设置"
+                  >
+                    <span data-icon="close" aria-hidden="true"></span>
+                  </button>
+                </div>
+                <label class="modelField">
+                  <span>渠道</span>
+                  <select
+                    id="channelQuickInput"
+                    class="quickSelect"
+                    aria-label="模型渠道"
+                  ></select>
+                </label>
+                <label class="modelField">
+                  <span>模型</span>
+                  <select
+                    id="modelQuickInput"
+                    class="quickSelect"
+                    aria-label="模型"
+                  ></select>
+                </label>
+                <label class="modelField">
+                  <span>推理</span>
+                  <select
+                    id="effortQuickInput"
+                    class="quickSelect"
+                    aria-label="推理强度"
+                  >
+                    <option value="off">off</option>
+                    <option value="low">low</option>
+                    <option value="high">high</option>
+                    <option value="max">max</option>
+                  </select>
+                </label>
+                <form id="setupForm" class="setupForm" hidden>
+                  <input
+                    id="apiKeyInput"
+                    type="password"
+                    autocomplete="off"
+                    placeholder="粘贴 API Key"
+                  />
+                  <span id="setupChannelHint" class="setupHint"></span>
+                  <button type="submit">连接</button>
+                </form>
+                <div class="modelPopoverFooter">
+                  <span
+                    id="quickStatus"
+                    class="quickStatus"
+                    aria-live="polite"
+                  ></span>
+                  <button
+                    id="openAdvancedSettings"
+                    type="button"
+                    class="textButton"
+                  >
+                    更多设置
+                  </button>
+                </div>
+              </aside>
+            </div>
+          </section>
+
+          <section
+            id="settingsView"
+            class="settingsView"
+            hidden
+            aria-label="embuddies设置"
+          >
+            <div class="settingsHeader">
+              <div>
+                <span class="eyebrow">SETTINGS</span>
+                <h2>embuddies设置</h2>
+                <p>设置当前模型、渠道、外观和 Agent 工作目录。</p>
+              </div>
+              <button id="backToChat" class="textButton" type="button">
+                返回对话
+              </button>
+            </div>
+            <nav class="settingsNav" aria-label="设置分区">
+              <a href="#settingsModel">模型</a
+              ><a href="#settingsChannels">渠道</a
+              ><a href="#settingsAppearance">外观</a
+              ><a href="#settingsWorkspace">工作区</a>
+            </nav>
+            <div id="settingsModel" class="settingCard">
+              <span class="settingCardTitle">当前模型</span>
+              <label class="settingRow">
+                <span
+                  ><strong>渠道</strong><small>任务使用的模型来源</small></span
+                >
+                <select
+                  id="channelInput"
+                  class="quickSelect"
+                  aria-label="模型渠道"
+                ></select>
+              </label>
+              <label class="settingRow">
+                <span
+                  ><strong>模型</strong
+                  ><small>当前渠道下可用的模型</small></span
+                >
+                <select id="modelInput" class="quickSelect"></select>
+              </label>
+              <label class="settingRow">
+                <span
+                  ><strong>推理深度</strong
+                  ><small>off 最快，max 最强</small></span
+                >
+                <select id="effortInput" class="quickSelect">
+                  <option value="off">off · 最快</option>
+                  <option value="low" selected>low · 推荐</option>
+                  <option value="high">high · 深度</option>
+                  <option value="max">max · 最大</option>
+                </select>
+              </label>
+              <span
+                id="advancedQuickStatus"
+                class="quickStatus"
+                aria-live="polite"
+              ></span>
+            </div>
+            <div id="settingsChannels" class="settingCard">
+              <span class="settingCardTitle">渠道管理</span>
+              <label class="settingRow">
+                <span
+                  ><strong>当前渠道</strong
+                  ><small>选择要编辑的模型来源</small></span
+                >
+                <select
+                  id="channelSelect"
+                  class="quickSelect"
+                  aria-label="编辑渠道"
+                ></select>
+              </label>
+              <label class="settingRow settingColumn">
+                <span
+                  ><strong>渠道名称</strong
+                  ><small>显示在界面上的名字</small></span
+                >
+                <input
+                  id="channelLabelInput"
+                  class="settingTextInput"
+                  type="text"
+                  spellcheck="false"
+                />
+              </label>
+              <label class="settingRow settingColumn">
+                <span
+                  ><strong>接口地址</strong
+                  ><small>OpenAI 兼容 Base URL</small></span
+                >
+                <input
+                  id="channelBaseURLInput"
+                  class="settingTextInput"
+                  type="text"
+                  spellcheck="false"
+                  placeholder="https://example.com/v1"
+                />
+              </label>
+              <label class="settingRow settingColumn">
+                <span><strong>API Key</strong><small>只保存在本机</small></span>
+                <input
+                  id="channelKeyInput"
+                  class="settingTextInput"
+                  type="password"
+                  autocomplete="off"
+                  placeholder="粘贴该渠道的 Key"
+                />
+              </label>
+              <label class="settingRow settingColumn">
+                <span
+                  ><strong>模型</strong
+                  ><small>可用模型，多个用逗号分隔</small></span
+                >
+                <input
+                  id="channelModelInput"
+                  class="settingTextInput"
+                  type="text"
+                  spellcheck="false"
+                  placeholder="gpt-5.6-sol, gemini-3.5-flash"
+                />
+              </label>
+              <label class="settingRow">
+                <span><strong>接口类型</strong><small>网关协议</small></span>
+                <select id="channelApiInput" class="quickSelect">
+                  <option value="openai-completions">openai-completions</option>
+                  <option value="openai-responses">openai-responses</option>
+                </select>
+              </label>
+              <label class="settingRow">
+                <span
+                  ><strong>支持推理强度</strong
+                  ><small>网关是否接受 reasoning_effort</small></span
+                >
+                <input id="channelReasoningInput" type="checkbox" />
+              </label>
+              <div class="agentSettingActions">
+                <button id="saveChannel" type="button">保存渠道</button>
+                <button id="newChannel" type="button" class="ghostButton">
+                  新建自定义渠道
+                </button>
+                <button id="deleteChannel" type="button" class="ghostButton">
+                  删除渠道
+                </button>
+                <span id="channelStatus" aria-live="polite"></span>
+              </div>
+            </div>
+            <div id="settingsAppearance" class="settingCard">
+              <span class="settingCardTitle">外观</span>
+              <label class="settingRow">
+                <span
+                  ><strong>embuddies颜色</strong
+                  ><small>线条、眼睛与状态色</small></span
+                >
+                <input id="colorInput" type="color" value="#22D6D0" />
+              </label>
+              <label class="settingRow">
+                <span
+                  ><strong>embuddies大小</strong
+                  ><small id="sizeValue">标准</small></span
+                >
+                <input
+                  id="sizeInput"
+                  type="range"
+                  min="0.75"
+                  max="1.35"
+                  step="0.05"
+                  value="1"
+                />
+              </label>
+              <label class="settingRow">
+                <span
+                  ><strong>窗口置顶</strong
+                  ><small>开启后embuddies始终浮在其他窗口之上</small></span
+                >
+                <input id="alwaysOnTopInput" type="checkbox" />
+              </label>
+              <div class="settingPreview">
+                <span>预览</span><span class="previewDot"></span>
+              </div>
+            </div>
+            <div id="settingsWorkspace" class="settingCard">
+              <span class="settingCardTitle">工作区与权限</span>
+              <label class="settingRow settingColumn">
+                <span
+                  ><strong>Agent 工作目录</strong
+                  ><small>文件工具只能在这个目录内写入</small></span
+                >
+                <span class="workspaceInputRow">
+                  <input
+                    id="workspaceInput"
+                    class="settingTextInput"
+                    type="text"
+                    spellcheck="false"
+                    placeholder="C:\你的项目目录"
+                  />
+                  <button id="chooseWorkspace" type="button">选择文件夹</button>
+                </span>
+              </label>
+              <div class="agentSettingActions">
+                <button id="saveAgentSettings" type="button">
+                  保存 Agent 设置
+                </button>
+                <span id="settingsStatus" aria-live="polite"></span>
+              </div>
+            </div>
+            <div class="settingsNote">
+              外观自动保存；Agent 设置会在各对话下次运行时生效。遥测已关闭。
+            </div>
+          </section>
+        </div>
+
+        <nav
+          id="workspaceContextMenu"
+          class="contextMenu workspaceContextMenu"
+          aria-label="工作区快捷菜单"
+          hidden
+        >
+          <button id="workspaceContextSettings" type="button">
+            工作区设置
+          </button>
+          <button id="workspaceContextPin" type="button">置顶工作区</button>
+          <button id="workspaceContextResourceize" type="button">
+            保存为资源
+          </button>
+          <button
+            id="workspaceContextDelete"
+            class="dangerAction"
+            type="button"
+          >
+            删除工作区
+          </button>
+        </nav>
+
+        <nav
+          id="conversationContextMenu"
+          class="contextMenu conversationContextMenu"
+          aria-label="对话快捷菜单"
+          hidden
+        >
+          <button id="conversationContextResourceize" type="button">
+            保存为资源
+          </button>
+          <button
+            id="conversationContextDelete"
+            class="dangerAction"
+            type="button"
+          >
+            删除对话
+          </button>
+        </nav>
+
+        <div id="entryModal" class="entryModal" hidden>
+          <div class="entryModalBackdrop" data-entry-cancel></div>
+          <section
+            class="entryModalCard"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="entryModalTitle"
+          >
+            <header class="entryModalHeader">
+              <strong id="entryModalTitle">新建</strong>
+              <button
+                id="entryModalClose"
+                class="iconButton"
+                type="button"
+                aria-label="关闭"
+                title="关闭"
+              >
+                <span data-icon="close" aria-hidden="true"></span>
+              </button>
+            </header>
+            <form id="entryModalForm">
+              <div id="entryModalFields" class="entryModalFields"></div>
+              <div
+                id="entryModalError"
+                class="dialogError"
+                role="alert"
+                hidden
+              ></div>
+              <div class="entryModalActions">
+                <button id="entryModalCancel" class="ghostButton" type="button">
+                  取消
+                </button>
+                <button id="entryModalSubmit" type="submit">创建</button>
+              </div>
+            </form>
+          </section>
+        </div>
+
+        <div id="resourceDetailModal" class="entryModal" hidden>
+          <div class="entryModalBackdrop" data-resource-detail-cancel></div>
+          <section
+            class="entryModalCard resourceDetailCard"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="resourceDetailTitle"
+          >
+            <header class="entryModalHeader">
+              <strong id="resourceDetailTitle"></strong>
+              <button
+                id="resourceDetailClose"
+                class="iconButton"
+                type="button"
+                aria-label="关闭"
+                title="关闭"
+              >
+                <span data-icon="close" aria-hidden="true"></span>
+              </button>
+            </header>
+            <div id="resourceDetailType" class="resourceDetailType"></div>
+            <div
+              id="resourceDetailSource"
+              class="resourceDetailSource"
+              hidden
+            ></div>
+            <p
+              id="resourceDetailSummary"
+              class="resourceDetailSummary"
+              hidden
+            ></p>
+            <pre id="resourceDetailContent" class="resourceDetailContent"></pre>
+            <details
+              id="resourceDetailOriginal"
+              class="resourceDetailOriginal"
+              hidden
+            >
+              <summary>原始内容</summary>
+              <pre
+                id="resourceDetailOriginalContent"
+                class="resourceDetailContent"
+              ></pre>
+            </details>
+            <div
+              id="resourceDetailStatus"
+              class="dialogError"
+              role="status"
+            ></div>
+            <div class="entryModalActions">
+              <button
+                id="resourceDetailRefresh"
+                class="ghostButton"
+                type="button"
+              >
+                更新并阅读
+              </button>
+              <span class="entryModalActionsSpacer"></span>
+              <button id="resourceDetailAttach" type="button">
+                加入当前工作区
+              </button>
+            </div>
+          </section>
+        </div>
+
+        <div id="workspaceSettingsModal" class="entryModal" hidden>
+          <div class="entryModalBackdrop" data-workspace-settings-cancel></div>
+          <section
+            class="entryModalCard workspaceSettingsCard"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="workspaceSettingsTitle"
+          >
+            <header class="entryModalHeader">
+              <strong id="workspaceSettingsTitle">工作区设置</strong>
+              <button
+                id="workspaceSettingsClose"
+                class="iconButton"
+                type="button"
+                aria-label="关闭"
+                title="关闭"
+              >
+                <span data-icon="close" aria-hidden="true"></span>
+              </button>
+            </header>
+            <form id="workspaceSettingsForm">
+              <label class="entryModalField">
+                <span>名称</span>
+                <input id="workspaceSettingsName" name="name" type="text" />
+              </label>
+              <label class="entryModalField">
+                <span>项目目录</span>
+                <span class="workspaceSettingsPathRow">
+                  <input
+                    id="workspaceSettingsPath"
+                    name="executionRoot"
+                    type="text"
+                    spellcheck="false"
+                  />
+                  <button id="workspaceSettingsChoose" type="button">
+                    选择
+                  </button>
+                </span>
+                <span
+                  id="workspaceSettingsPathError"
+                  class="dialogError"
+                  role="alert"
+                  hidden
+                ></span>
+              </label>
+              <label class="workspacePinField">
+                <input
+                  id="workspaceSettingsPinned"
+                  name="pinned"
+                  type="checkbox"
+                />
+                <span>置顶工作区</span>
+              </label>
+              <div class="entryModalActions">
+                <button
+                  id="workspaceSettingsDelete"
+                  class="dangerButton"
+                  type="button"
+                >
+                  删除
+                </button>
+                <span class="entryModalActionsSpacer"></span>
+                <button
+                  id="workspaceSettingsCancel"
+                  class="ghostButton"
+                  type="button"
+                >
+                  取消
+                </button>
+                <button id="workspaceSettingsSave" type="submit">保存</button>
+              </div>
+            </form>
+          </section>
+        </div>
+
+        <div class="windowResizeHandle windowResizeN" data-edge="n"></div>
+        <div class="windowResizeHandle windowResizeNE" data-edge="ne"></div>
+        <div class="windowResizeHandle windowResizeE" data-edge="e"></div>
+        <div class="windowResizeHandle windowResizeSE" data-edge="se"></div>
+        <div class="windowResizeHandle windowResizeS" data-edge="s"></div>
+        <div class="windowResizeHandle windowResizeSW" data-edge="sw"></div>
+        <div class="windowResizeHandle windowResizeW" data-edge="w"></div>
+        <div class="windowResizeHandle windowResizeNW" data-edge="nw"></div>
+      </section>
+    </main>
+
+    <script src="/js/neutralino.js"></script>
+    <script src="/js/host-bridge.js"></script>
+    <script>
+      // WebView2 compatibility mode: the Edge fallback has no Neutralino host.
+      if (!window.NL_TOKEN && window.Neutralino) {
+        const nativeNeutralino = window.Neutralino;
+        window.Neutralino = {
+          ...nativeNeutralino,
+          app: { ...nativeNeutralino.app, exit: () => window.close() },
+          clipboard: {
+            ...nativeNeutralino.clipboard,
+            writeText: (text) => navigator.clipboard?.writeText(text),
+          },
+          os: {
+            ...nativeNeutralino.os,
+          },
+        };
+      }
+    </script>
+    <script type="module" src="/js/main.js"></script>
+  </body>
+</html>

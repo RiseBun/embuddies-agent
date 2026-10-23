@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>embuddies · 相识与记忆</title>
+    <link rel="stylesheet" href="prototype.css" />
+    <script src="prototype.js" defer></script>
+  </head>
+  <body>
+    <main class="app" id="app">
+      <header class="app-header">
+        <strong class="wordmark"
+          >embuddies<span class="brand-dot" aria-hidden="true"></span
+        ></strong>
+        <span id="status" class="sr-only" role="status">在这里</span>
+      </header>
+
+      <section class="encounter" aria-label="与 embuddies 对话">
+        <div class="buddy-stage">
+          <button
+            type="button"
+            id="buddy"
+            class="buddy"
+            aria-label="和 embuddies 打个招呼"
+          >
+            <svg
+              viewBox="35 18 250 224"
+              role="img"
+              aria-label="原环形 embuddies"
+            >
+              <path
+                fill="currentColor"
+                fill-rule="evenodd"
+                d="M158 29 C224 28 271 69 272 126 C273 184 226 226 161 229 C96 230 48 188 48 130 C47 72 93 32 158 29 Z M158 37 C99 40 56 76 56 130 C56 180 102 216 161 216 C220 213 264 177 264 126 C263 75 218 36 158 37 Z"
+              />
+              <g id="eye-direction">
+                <g class="eyes" fill="currentColor">
+                  <ellipse cx="126" cy="128" rx="25" ry="25" />
+                  <ellipse cx="194" cy="128" rx="25" ry="25" />
+                </g>
+              </g>
+            </svg>
+          </button>
+          <span
+            class="ground-shadow"
+            id="ground-shadow"
+            aria-hidden="true"
+          ></span>
+          <span id="buddy-note" class="sr-only"></span>
+        </div>
+        <div class="conversation">
+          <div id="conversation-content" aria-live="polite"></div>
+          <div id="conversation-actions" class="conversation-actions"></div>
+          <div id="candidate" class="candidate" hidden></div>
+        </div>
+      </section>
+
+      <section class="composer-area" aria-label="输入消息">
+        <div id="reply-history" class="reply-history" aria-live="polite"></div>
+        <form id="composer" class="composer">
+          <label class="sr-only" for="message">告诉 embuddies</label>
+          <input
+            id="message"
+            autocomplete="off"
+            maxlength="300"
+            placeholder="说点什么…"
+          />
+          <button type="submit" class="send" aria-label="发送">↑</button>
+        </form>
+        <span id="memory-mode" class="sr-only">记忆需要你确认</span>
+      </section>
+
+      <div id="scrim" class="scrim" hidden></div>
+      <aside
+        id="memory-panel"
+        class="drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="memory-title"
+        hidden
+      >
+        <header class="drawer-header">
+          <h2 id="memory-title">我对你的认识</h2>
+          <button type="button" data-close aria-label="关闭记忆">×</button>
+        </header>
+        <div id="memory-list" class="memory-list"></div>
+        <footer class="drawer-footer">
+          <button type="button" id="export">导出演示记忆</button>
+        </footer>
+      </aside>
+      <aside
+        id="settings-panel"
+        class="drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
+        hidden
+      >
+        <header class="drawer-header">
+          <h2 id="settings-title">相处方式</h2>
+          <button type="button" data-close aria-label="关闭偏好">×</button>
+        </header>
+        <section class="setting-section">
+          <h3>什么时候主动开口</h3>
+          <label class="radio-row"
+            ><input type="radio" name="initiative" value="quiet" /><span
+              ><strong>等我叫你</strong></span
+            ></label
+          >
+          <label class="radio-row"
+            ><input type="radio" name="initiative" value="gentle" /><span
+              ><strong>偶尔提醒</strong></span
+            ></label
+          >
+          <label class="radio-row"
+            ><input type="radio" name="initiative" value="active" /><span
+              ><strong>更主动一点</strong></span
+            ></label
+          >
+        </section>
+        <section class="setting-section">
+          <label class="switch-row"
+            ><span><strong>形成新记忆</strong></span
+            ><input type="checkbox" id="remember-enabled"
+          /></label>
+        </section>
+        <section class="setting-section">
+          <label class="switch-row"
+            ><span><strong>使用已有记忆</strong></span
+            ><input type="checkbox" id="use-enabled"
+          /></label>
+        </section>
+        <section class="setting-section">
+          <label class="switch-row"
+            ><span><strong>减少动作</strong></span
+            ><input type="checkbox" id="reduce-motion"
+          /></label>
+        </section>
+        <button type="button" id="resume-prompts">恢复主动提醒</button>
+      </aside>
+      <div id="notice" class="notice" role="status" hidden></div>
+    </main>
+  </body>
+</html>

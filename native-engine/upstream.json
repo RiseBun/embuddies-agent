@@ -1,0 +1,12 @@
+{
+  "product": "embuddies",
+  "upstream": "https://github.com/openai/codex",
+  "baseline": "aa380897f67b91e1a47d530d7286d497b6726d3f",
+  "sourceDirectory": "embuddies-core",
+  "branch": "codex/embuddies-runtime",
+  "toolchain": "1.95.0",
+  "target": "x86_64-pc-windows-msvc",
+  "binary": "embuddies-runtime.exe",
+  "transport": "stdio-jsonrpc",
+  "status": "native-core-verified-desktop-candidate"
+}

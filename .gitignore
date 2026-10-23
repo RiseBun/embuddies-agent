@@ -1,0 +1,40 @@
+# Dependencies
+runtime/node_modules/
+runtime/.npm-cache/
+
+# Unrelated upstream reference checkout (not part of embuddies)
+codex/
+embuddies-core/
+desktop/node_modules/
+frontend/node_modules/
+frontend/dist/
+.tmp/
+native-engine/candidates/
+
+# Runtime secrets and local sessions
+runtime/data/
+
+# Neutralino downloaded binaries and generated bundles
+shell/bin/
+shell/dist/
+shell/.storage/
+shell/*.log
+shell/.git/
+shell/.npm-cache/
+shell/shell/
+
+# Build artifacts
+build/
+*.zip
+*.exe
+
+# Local/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.user
+*.suo
+debug.log
+.tmp-electron-2.log
+*.lnk

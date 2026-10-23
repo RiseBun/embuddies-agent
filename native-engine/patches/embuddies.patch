@@ -1,0 +1,214 @@
+diff --git a/codex-rs/app-server/Cargo.toml b/codex-rs/app-server/Cargo.toml
+index ad0a5fbab3..e436a4f605 100644
+--- a/codex-rs/app-server/Cargo.toml
++++ b/codex-rs/app-server/Cargo.toml
+@@ -8,6 +8,10 @@ license.workspace = true
+ name = "codex-app-server"
+ path = "src/main.rs"
+ 
++[[bin]]
++name = "embuddies-runtime"
++path = "src/bin/embuddies_runtime.rs"
++
+ [[bin]]
+ name = "codex-app-server-test-notify-capture"
+ path = "src/bin/notify_capture.rs"
+diff --git a/codex-rs/app-server/src/bin/embuddies_runtime.rs b/codex-rs/app-server/src/bin/embuddies_runtime.rs
+new file mode 100644
+index 0000000000..537767d8ab
+--- /dev/null
++++ b/codex-rs/app-server/src/bin/embuddies_runtime.rs
+@@ -0,0 +1,97 @@
++#![recursion_limit = "256"]
++
++use clap::Parser;
++use codex_app_server::AppServerRuntimeOptions;
++use codex_app_server::AppServerTransport;
++use codex_app_server::RemoteControlStartupMode;
++use codex_app_server::run_main_with_transport_options;
++use codex_arg0::Arg0DispatchPaths;
++use codex_arg0::arg0_dispatch_or_else;
++use codex_config::LoaderOverrides;
++use codex_protocol::protocol::SessionSource;
++use codex_utils_cli::CliConfigOverrides;
++use std::path::PathBuf;
++
++#[derive(Debug, Parser)]
++#[command(
++    name = "embuddies-runtime",
++    version = "0.3.0",
++    about = "embuddies native Agent runtime"
++)]
++struct RuntimeArgs {
++    #[command(flatten)]
++    config_overrides: CliConfigOverrides,
++}
++
++fn runtime_home() -> anyhow::Result<PathBuf> {
++    if let Some(path) = std::env::var_os("EMBUDDIES_RUNTIME_HOME") {
++        let path = PathBuf::from(path);
++        anyhow::ensure!(
++            path.is_absolute(),
++            "embuddies runtime directory must be absolute"
++        );
++        return Ok(path);
++    }
++    let local = std::env::var_os("LOCALAPPDATA")
++        .ok_or_else(|| anyhow::anyhow!("embuddies requires a local application data directory"))?;
++    Ok(PathBuf::from(local)
++        .join("embuddies")
++        .join("data")
++        .join("native-engine"))
++}
++
++fn loader_overrides(home: &std::path::Path) -> LoaderOverrides {
++    let policy = home.join("policy");
++    LoaderOverrides {
++        managed_config_path: Some(policy.join("managed_config.toml")),
++        system_config_path: Some(policy.join("config.toml")),
++        system_requirements_path: Some(policy.join("requirements.toml")),
++        ignore_project_config: true,
++        ignore_user_and_project_exec_policy_rules: true,
++        ..Default::default()
++    }
++}
++
++fn main() -> anyhow::Result<()> {
++    let helper = std::env::args().nth(1).is_some_and(|arg| {
++        arg.starts_with("--codex-run-as-")
++            || arg == "--run-as-windows-sandbox"
++            || arg == "--__codex-windows-mxc"
++    });
++    if helper {
++        // Helper environments deliberately omit application profile variables.
++        // Dispatch them before resolving or creating any desktop data directory.
++        return arg0_dispatch_or_else(|_| async {
++            anyhow::bail!("Unsupported embuddies native helper invocation")
++        });
++    }
++    let home = runtime_home()?;
++    // SAFETY: configure the independent profile before starting Tokio, native
++    // helper dispatch, or any worker thread that could read the environment.
++    unsafe { std::env::set_var("CODEX_HOME", &home) };
++    arg0_dispatch_or_else(move |arg0_paths: Arg0DispatchPaths| async move {
++        // Native patch/sandbox helper invocations exit during arg0 dispatch.
++        // They must not try to write the application profile under a restricted token.
++        std::fs::create_dir_all(&home)?;
++        let args = RuntimeArgs::parse();
++        let exit = run_main_with_transport_options(
++            arg0_paths,
++            args.config_overrides,
++            loader_overrides(&home),
++            /*strict_config*/ true,
++            /*default_analytics_enabled*/ false,
++            AppServerTransport::Stdio,
++            SessionSource::from_startup_arg("vscode").map_err(anyhow::Error::msg)?,
++            Default::default(),
++            AppServerRuntimeOptions {
++                remote_control_startup_mode: RemoteControlStartupMode::DisabledEphemeral,
++                ..Default::default()
++            },
++        )
++        .await?;
++        if exit == codex_app_server::AppServerExit::Forced {
++            std::process::exit(0);
++        }
++        Ok(())
++    })
++}
+diff --git a/codex-rs/app-server/tests/embuddies_entry.rs b/codex-rs/app-server/tests/embuddies_entry.rs
+new file mode 100644
+index 0000000000..23e8bf3b07
+--- /dev/null
++++ b/codex-rs/app-server/tests/embuddies_entry.rs
+@@ -0,0 +1,50 @@
++use std::io::Write;
++use std::process::Command;
++use std::process::Stdio;
++
++use pretty_assertions::assert_eq;
++use serde_json::json;
++
++#[test]
++fn file_helper_does_not_initialize_the_desktop_profile() -> anyhow::Result<()> {
++    let directory = std::env::temp_dir().join(format!(
++        "embuddies-helper-{}-{}",
++        std::process::id(),
++        std::time::SystemTime::now()
++            .duration_since(std::time::UNIX_EPOCH)?
++            .as_nanos()
++    ));
++    std::fs::create_dir_all(&directory)?;
++    let target = directory.join("result.txt");
++    let uri = url::Url::from_file_path(&target).map_err(|_| anyhow::anyhow!("test path"))?;
++    // A helper's reduced environment has no desktop profile; an invalid profile
++    // value must neither be resolved nor created during native helper dispatch.
++    let mut child = Command::new(env!("CARGO_BIN_EXE_embuddies-runtime"))
++        .arg("--codex-run-as-fs-helper")
++        .env_remove("LOCALAPPDATA")
++        .env("EMBUDDIES_RUNTIME_HOME", "invalid-relative-profile")
++        .stdin(Stdio::piped())
++        .stdout(Stdio::piped())
++        .stderr(Stdio::piped())
++        .spawn()?;
++    let request = json!({"operation":"fs/writeFile", "params":{
++        "path":uri.as_str(), "dataBase64":"dmVyaWZpZWQ=", "sandbox":null
++    }});
++    writeln!(child.stdin.take().expect("helper stdin"), "{request}")?;
++    let output = child.wait_with_output()?;
++    assert!(
++        output.status.success(),
++        "{}",
++        String::from_utf8_lossy(&output.stderr)
++    );
++    let response: serde_json::Value = serde_json::from_slice(&output.stdout)?;
++    assert_eq!(
++        response,
++        json!({"status":"ok", "payload":{
++            "operation":"fs/writeFile", "response":{}
++        }})
++    );
++    assert_eq!(std::fs::read(&target)?, b"verified");
++    std::fs::remove_dir_all(directory)?;
++    Ok(())
++}
+diff --git a/scripts/format.py b/scripts/format.py
+index 9b408e1c7c..7487bf4141 100644
+--- a/scripts/format.py
++++ b/scripts/format.py
+@@ -2,6 +2,7 @@
+ """Format repository sources or check that they are already formatted."""
+ 
+ import argparse
++import json
+ import os
+ import shlex
+ import subprocess
+@@ -44,8 +45,25 @@ def rust_formatter_group(*, check: bool) -> FormatterGroup:
+     args = ["cargo", "fmt", "--", "--config", "imports_granularity=Item"]
+     if check:
+         args.append("--check")
+-    command = Command(tuple(args), REPO_ROOT / "codex-rs")
+-    return FormatterGroup("Rust", (command,))
++    rust_root = REPO_ROOT / "codex-rs"
++    if os.name == "nt":
++        # cargo-fmt otherwise passes every workspace source path to one rustfmt
++        # process, exceeding Windows' command line limit in nested checkouts.
++        metadata = json.loads(
++            subprocess.check_output(
++                ["cargo", "metadata", "--no-deps", "--format-version", "1"],
++                cwd=rust_root,
++            )
++        )
++        commands = tuple(
++            Command(
++                tuple(["cargo", "fmt", "-p", package["name"], *args[2:]]), rust_root
++            )
++            for package in metadata["packages"]
++            if package["id"] in metadata["workspace_members"]
++        )
++        return FormatterGroup("Rust", commands)
++    return FormatterGroup("Rust", (Command(tuple(args), rust_root),))
+ 
+ 
+ def buildifier_formatter_group(*, check: bool) -> FormatterGroup:
