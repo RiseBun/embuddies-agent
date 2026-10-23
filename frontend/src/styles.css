@@ -662,6 +662,122 @@ button svg {
   min-height: 32px;
 }
 
+/* ===== 自进化面板 ===== */
+.evolution-dialog {
+  width: min(820px, 100%);
+}
+.evolution-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.evolution-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.evolution-intent {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+.evolution-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+.evolution-item {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.evolution-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.evolution-item-head strong {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.evolution-status {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--muted);
+}
+.evolution-status.pending {
+  background: var(--mint-soft);
+  color: #267c65;
+}
+.evolution-status.applied {
+  background: #e6f3ea;
+  color: #248b68;
+}
+.evolution-status.rejected {
+  background: #faeaea;
+  color: var(--danger);
+}
+.evolution-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.evolution-meta .danger {
+  color: var(--danger);
+}
+.evolution-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.evolution-actions button {
+  font-size: 11px;
+  min-height: 28px;
+}
+.evolution-item details {
+  margin-top: 12px;
+  font-size: 12px;
+}
+.evolution-item summary {
+  cursor: pointer;
+  color: var(--text);
+  padding-block: 4px;
+}
+.evolution-item details p {
+  color: var(--muted);
+  margin-block: 8px;
+}
+.evolution-diff pre,
+.evolution-evidence pre {
+  background: var(--surface);
+  padding: 10px;
+  max-height: 300px;
+  overflow: auto;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+.evolution-response {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.evolution-commit {
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 @media (max-width: 460px) {
   .persona-status {
     display: none;
@@ -670,4 +786,3 @@ button svg {
     font-size: 11px;
   }
 }
-

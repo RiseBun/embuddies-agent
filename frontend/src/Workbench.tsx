@@ -12,6 +12,7 @@ import {
   ArrowUp,
   Copy,
   ShieldCheck,
+  Sparkles,
   ChevronDown,
 } from "lucide-react";
 import { request, host } from "./api";
@@ -556,6 +557,13 @@ export function Workbench() {
                 {approvals.length > 0 && (
                   <span className="count">{approvals.length}</span>
                 )}
+              </button>
+              <button
+                data-trigger
+                onClick={() => setLayer({ kind: "self-improve" })}
+              >
+                <Sparkles size={15} />
+                自进化
               </button>
               <button
                 title="复制回复"

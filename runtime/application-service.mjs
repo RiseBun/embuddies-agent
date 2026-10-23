@@ -12,6 +12,7 @@ import { createConversationStore } from "./conversation-store.mjs";
 import { EmbuddiesRuntimePool } from "./embuddies-runtime-pool.mjs";
 import { EmbuddiesRuntime } from "./embuddies-runtime.mjs";
 import { createApprovalBroker } from "./approval-broker.mjs";
+import { createSelfImproveService } from "./self-improve-service.mjs";
 import { normalizeRuntimeEvent } from "./event-normalizer.mjs";
 import { assistantOutput } from "./assistant-output.mjs";
 import { pickWindowsFolder } from "./folder-picker.mjs";
@@ -94,6 +95,8 @@ const engine = new EmbuddiesRuntimePool(configStore, {
   approvalBroker,
   Runtime: engineMode === "native" ? null : EmbuddiesRuntime,
 });
+// Keep ordinary chat/native capabilities out of the file-only evolution runtime.
+const selfImprove = createSelfImproveService({ configStore, dataRoot });
 
 let runtimeState = "starting";
 let lastError = null;
@@ -1076,6 +1079,35 @@ async function handleConversationDelete(request, response) {
   sendJson(response, 200, { ok: true });
 }
 
+async function handleSelfImproveStart(request, response) {
+  const body = await readJson(request);
+  const result = selfImprove.launch({
+    intent: body.intent,
+  });
+  sendJson(response, 202, { ok: true, ...result });
+}
+
+async function handleSelfImproveFreeze(request, response) {
+  const body = await readJson(request);
+  sendJson(response, 200, {
+    ok: true,
+    ...(await selfImprove.setFrozen(body.frozen)),
+  });
+}
+
+async function handleSelfImproveList(_request, response) {
+  sendJson(response, 200, { ok: true, ...(await selfImprove.list()) });
+}
+
+async function handleSelfImproveDecide(request, response) {
+  const body = await readJson(request);
+  const result = await selfImprove.decide({
+    id: body.id,
+    decision: body.decision,
+  });
+  sendJson(response, 200, { ok: true, ...result });
+}
+
 export async function handleApplicationRequest(request, response) {
   try {
     const origin = request.headers.origin;
@@ -1109,6 +1141,14 @@ export async function handleApplicationRequest(request, response) {
       return await handleApprovalDecide(request, response);
     if (request.method === "GET" && request.url === "/approvals")
       return await handleApprovals(request, response);
+    if (request.method === "POST" && request.url === "/self-improve/start")
+      return await handleSelfImproveStart(request, response);
+    if (request.method === "GET" && request.url === "/self-improve/proposals")
+      return await handleSelfImproveList(request, response);
+    if (request.method === "POST" && request.url === "/self-improve/decide")
+      return await handleSelfImproveDecide(request, response);
+    if (request.method === "POST" && request.url === "/self-improve/freeze")
+      return await handleSelfImproveFreeze(request, response);
     if (request.method === "POST" && request.url === "/config")
       return await handleConfig(request, response);
     if (request.method === "POST" && request.url === "/config/test")
@@ -1218,6 +1258,7 @@ export async function startApplication() {
 
 export async function closeApplication() {
   shuttingDown = true;
+  await selfImprove.close();
   for (const sessionId of engine.runningSessionIds())
     await engine.cancel(sessionId);
   while (reservedSessions.size)
@@ -1233,7 +1274,7 @@ export async function invokeApplication(
 ) {
   if (
     typeof requestPath !== "string" ||
-    !/^\/(?:health|config|prompt|cancel|approvals?|conversations?|resources?|workspaces?|runs|follow-ups|dialogs)(?:\/|\?|$)/.test(
+    !/^\/(?:health|config|prompt|cancel|approvals?|conversations?|resources?|workspaces?|runs|follow-ups|dialogs|self-improve)(?:\/|\?|$)/.test(
       requestPath,
     )
   )

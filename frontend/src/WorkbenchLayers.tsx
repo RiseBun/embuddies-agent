@@ -22,6 +22,7 @@ import type {
 import { CreationForm, ModelForm, ResourceForm, Dialog } from "./Forms";
 import { labels } from "./Resources";
 import { ApprovalCard } from "./ApprovalCard";
+import { EvolutionPanel } from "./EvolutionPanel";
 import { request, host } from "./api";
 type Props = {
   layer: Layer | null;
@@ -321,6 +322,9 @@ export function WorkbenchLayers({
             }}
           />
         </Dialog>
+      )}
+      {layer?.kind === "self-improve" && (
+        <EvolutionPanel onClose={() => setLayer(null)} onApplied={refresh} />
       )}
     </>
   );

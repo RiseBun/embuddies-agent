@@ -501,8 +501,38 @@ export function createResourceStore(
     });
   }
 
-  async function readStarterSkill(id) {
-    const starter = STARTER_SKILLS.find((item) => item.id === id);
+  async function starterDefinitions() {
+    const entries = await fs
+      .readdir(path.join(runtimeRoot, "starter-skills"), {
+        withFileTypes: true,
+      })
+      .catch((error) => {
+        if (error.code === "ENOENT") return [];
+        throw error;
+      });
+    const known = new Set(STARTER_SKILLS.map((item) => item.file));
+    const evolved = entries
+      .filter(
+        (entry) =>
+          entry.isFile() &&
+          entry.name.endsWith(".md") &&
+          !known.has(entry.name),
+      )
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((entry) => ({
+        id: `evolved-${crypto.createHash("sha256").update(entry.name).digest("hex").slice(0, 24)}`,
+        file: entry.name,
+        name: entry.name.slice(0, -3),
+        description: "",
+        evolved: true,
+      }));
+    return [...STARTER_SKILLS, ...evolved];
+  }
+
+  async function readStarterSkill(id, definitions = null) {
+    const starter = (definitions || (await starterDefinitions())).find(
+      (item) => item.id === id,
+    );
     if (!starter) return null;
     const content = await fs
       .readFile(path.join(runtimeRoot, "starter-skills", starter.file), "utf8")
@@ -511,18 +541,35 @@ export function createResourceStore(
         throw error;
       });
     if (!content) return null;
+    const metadata = skillDocumentParts(content).metadata;
+    const name = starter.evolved
+      ? clean(
+          metadata.name || content.match(/^#\s+(.+)$/m)?.[1] || starter.name,
+          MAX_NAME,
+        )
+      : starter.name;
+    const description =
+      starter.description ||
+      clean(
+        metadata.description || "已通过改进提案合入的 Skill",
+        MAX_DESCRIPTION,
+      );
     return {
       ...normalizeResource({
         id: starter.id,
         type: "skill",
-        name: starter.name,
-        description: starter.description,
+        name,
+        description,
         content,
         config: { sourceUrl: starter.sourceUrl },
         createdAt: 0,
         updatedAt: 0,
-        processing: { status: "ready", stage: "内置 Skill", processedAt: 0 },
-        analysis: { status: "ready", summary: starter.description },
+        processing: {
+          status: "ready",
+          stage: starter.evolved ? "已合入 Skill" : "内置 Skill",
+          processedAt: 0,
+        },
+        analysis: { status: "ready", summary: description },
       }),
       readonly: true,
     };
@@ -570,8 +617,9 @@ export function createResourceStore(
 
   async function listResources() {
     const custom = await listCustomResources();
+    const definitions = await starterDefinitions();
     const starter = await Promise.all(
-      STARTER_SKILLS.map((item) => readStarterSkill(item.id)),
+      definitions.map((item) => readStarterSkill(item.id, definitions)),
     );
     // Conversations are records, not resources. They enter this list only after
     // an explicit conversation-to-resource conversion.

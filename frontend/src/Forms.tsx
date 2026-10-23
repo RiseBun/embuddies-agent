@@ -7,15 +7,17 @@ export function Dialog({
   title,
   children,
   onClose,
+  className = "",
 }: {
   title: string;
   children: React.ReactNode;
   onClose: () => void;
+  className?: string;
 }) {
   return (
     <div className="modal-backdrop">
       <section
-        className="dialog"
+        className={`dialog ${className}`}
         data-layer
         role="dialog"
         aria-modal="true"

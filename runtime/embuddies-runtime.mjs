@@ -314,6 +314,7 @@ async function walk(root, current, output, limit = 500) {
     .catch(() => []);
   for (const entry of entries) {
     if (output.length >= limit) break;
+    if (entry.isSymbolicLink()) continue;
     if ([".git", "node_modules", ".tmp", "dist", "build"].includes(entry.name))
       continue;
     const target = path.join(current, entry.name);
@@ -372,8 +373,7 @@ async function readOpenAIStream(response, onDelta) {
       const entry = calls.get(index) || { id: "", name: "", arguments: "" };
       if (call.id) entry.id = call.id;
       if (call.function?.name) entry.name = call.function.name;
-      if (call.function?.arguments)
-        entry.arguments += call.function.arguments;
+      if (call.function?.arguments) entry.arguments += call.function.arguments;
       calls.set(index, entry);
     }
   }
@@ -545,7 +545,14 @@ export class EmbuddiesRuntime {
     }
   }
 
-  async #request(channel, messages, tools, signal, allowRetry = true, onDelta = null) {
+  async #request(
+    channel,
+    messages,
+    tools,
+    signal,
+    allowRetry = true,
+    onDelta = null,
+  ) {
     const transport = resolveModelTransport(channel);
     const isAnthropic = transport.protocol === "anthropic";
     const endpoint = transport.endpoint;
@@ -729,8 +736,7 @@ export class EmbuddiesRuntime {
     ];
     if (!args || typeof args !== "object" || !actions.includes(args.action))
       throw new Error("浏览器参数无效");
-    if (!globalThis.embuddiesBrowser)
-      throw new Error("浏览器需要桌面宿主支持");
+    if (!globalThis.embuddiesBrowser) throw new Error("浏览器需要桌面宿主支持");
     const writeActions = new Set(["click", "type", "close-tab"]);
     if (context.permissionMode === "read-only" && writeActions.has(args.action))
       throw new Error("只读模式不允许网页写入操作");
@@ -778,13 +784,15 @@ export class EmbuddiesRuntime {
     const actions = ["observe", "act", "fill", "verify"];
     if (!args || typeof args !== "object" || !actions.includes(args.action))
       throw new Error("结构化工具参数无效");
-    if (!globalThis.embuddiesUi)
-      throw new Error("网页表单需要桌面宿主支持");
+    if (!globalThis.embuddiesUi) throw new Error("网页表单需要桌面宿主支持");
     const values = {
       ...args,
       workspaceId: context.browserSessionId || context.sessionId,
     };
-    if (context.permissionMode === "read-only" && ["act", "fill"].includes(args.action))
+    if (
+      context.permissionMode === "read-only" &&
+      ["act", "fill"].includes(args.action)
+    )
       throw new Error("只读模式不允许控件写入操作");
     if (["act", "fill"].includes(args.action)) {
       const approval = await this.#approve(
@@ -917,11 +925,16 @@ export class EmbuddiesRuntime {
       history = "",
       recoveryEvents = [],
       allowModelRetry = true,
+      toolPolicy = null,
+      signal = null,
     } = {},
   ) {
     if (!sessionId) throw new Error("缺少会话 id");
     if (this.#active.has(sessionId)) throw new Error("该对话正在执行任务");
     const controller = new AbortController();
+    const abort = () => controller.abort(signal.reason);
+    if (signal?.aborted) abort();
+    else signal?.addEventListener("abort", abort, { once: true });
     this.#active.set(sessionId, { controller, generation: this.#generation });
     const stream = new EmbuddiesEventStream(onNotification);
     const emit = (event) => stream.emit(event);
@@ -929,7 +942,9 @@ export class EmbuddiesRuntime {
       (event) => event.type === "tool_start" && toolRequiresWrite(event.name),
     );
     try {
-      const tools = this.#toolsEnabled ? toolDefinitions(agents) : [];
+      const tools = this.getToolDefinitions(agents).filter(
+        (tool) => !toolPolicy || toolPolicy.tools.includes(tool.function.name),
+      );
       const messages = [
         {
           role: "system",
@@ -938,6 +953,7 @@ export class EmbuddiesRuntime {
         { role: "user", content: message },
       ];
       let finalResponse = "";
+      let toolRoundLimitReached = false;
       for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
         const result = await this.#request(
           channel,
@@ -945,8 +961,7 @@ export class EmbuddiesRuntime {
           tools,
           controller.signal,
           allowModelRetry && round === 0,
-          (delta) =>
-            emit({ type: "assistant_delta", itemId: "answer", delta }),
+          (delta) => emit({ type: "assistant_delta", itemId: "answer", delta }),
         );
         if (result.text) {
           finalResponse = result.text;
@@ -957,6 +972,7 @@ export class EmbuddiesRuntime {
           });
         }
         if (!result.calls.length) break;
+        toolRoundLimitReached = round === MAX_TOOL_ROUNDS - 1;
         const assistant = {
           role: "assistant",
           content: result.text || null,
@@ -968,6 +984,7 @@ export class EmbuddiesRuntime {
         };
         messages.push(assistant);
         for (const call of result.calls) {
+          controller.signal.throwIfAborted();
           const args = parseToolArguments(call.arguments);
           emit({
             type: "tool_start",
@@ -979,6 +996,9 @@ export class EmbuddiesRuntime {
           const dangerous = toolRequiresWrite(call.name);
           let output;
           try {
+            if (!tools.some((tool) => tool.function.name === call.name))
+              throw new Error(`当前任务不允许使用工具：${call.name}`);
+            await toolPolicy?.assertCall(call.name, args);
             assertToolPermission(call.name, permissionMode);
             if (dangerous && requiresInspection)
               throw new Error(
@@ -1043,10 +1063,12 @@ export class EmbuddiesRuntime {
       }
       return {
         finalResponse,
+        toolRoundLimitReached,
         events: stream.values(),
         engine: "embuddies-model-agnostic",
       };
     } finally {
+      signal?.removeEventListener("abort", abort);
       this.#active.delete(sessionId);
     }
   }
