@@ -2,16 +2,16 @@
 :root {
   font-family: "Segoe UI Variable", "Segoe UI", "Microsoft YaHei", sans-serif;
   font-synthesis: none;
-  color: #202321;
+  color: #353b42;
   background: #fff;
-  --text: #202321;
-  --muted: #6a716c;
-  --line: #e8ebe7;
-  --surface: #f7f8f5;
+  --text: #353b42;
+  --muted: #6d7680;
+  --line: #e8ecef;
+  --surface: #fafbfc;
   --mint: #2aa998;
-  --mint-soft: #e9f4ef;
+  --mint-soft: #eff7f5;
   --danger: #c45c51;
-  --radius: 5px;
+  --radius: 7px;
   font-size: 13px;
   color-scheme: light;
 }
@@ -49,7 +49,7 @@ button {
   white-space: nowrap;
 }
 button:hover {
-  background: #eef1ec;
+  background: #f1f3f5;
 }
 button:disabled {
   opacity: 0.45;
@@ -58,14 +58,14 @@ button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: 2px solid #59b5a2;
+  outline: 2px solid #83b4aa;
   outline-offset: 2px;
 }
 input,
 textarea,
 select {
   background: #fff;
-  border: 1px solid #dce2da;
+  border: 1px solid #dfe5e9;
   border-radius: var(--radius);
   min-width: 0;
   padding: 7px 9px;
@@ -121,12 +121,12 @@ button svg {
 }
 .primary,
 .send-button {
-  background: #25332d;
-  color: white;
+  background: #edf5f2;
+  color: #286c62;
 }
 .primary:hover,
 .send-button:hover {
-  background: #394c42;
+  background: #deeee8;
 }
 .danger {
   color: var(--danger);
@@ -175,7 +175,7 @@ button svg {
   color: #22c6bb;
   flex-shrink: 0;
 }
-.brand.animated .eyes {
+.brand.animated:not(.interactive) .eyes {
   transform-box: fill-box;
   transform-origin: center;
   animation: blink 6s infinite;
@@ -336,8 +336,11 @@ button svg {
 .fatal p {
   margin: 20px 0;
 }
-.pet-window {
+html.pet-window,
+body.pet-window,
+.pet-window #root {
   background: transparent;
+  color-scheme: light;
 }
 .pet-root {
   height: 100%;
@@ -352,6 +355,11 @@ button svg {
   touch-action: none;
   cursor: default;
   padding: 20px;
+}
+.pet-body .brand {
+  display: block;
+  overflow: visible;
+  pointer-events: none;
 }
 .pet-menu {
   position: absolute;
@@ -619,8 +627,7 @@ button svg {
 
 /* ===== 聊天气泡打磨 ===== */
 .user-message {
-  border-radius: 12px;
-  box-shadow: 0 1px 2px #14221b0a;
+  border-radius: 10px;
 }
 .assistant-content > .markdown {
   font-size: 14px;
@@ -637,8 +644,8 @@ button svg {
   align-items: center;
   gap: 14px;
   padding: 11px 22px;
-  background: #f2f8f3;
-  border-bottom: 1px solid #dbe9dd;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
 }
 .onboarding-text {
   display: flex;
@@ -647,7 +654,7 @@ button svg {
   flex: 1;
   min-width: 0;
   font-size: 12px;
-  color: #3d5a48;
+  color: var(--muted);
 }
 .onboarding-text strong {
   font-size: 12px;
@@ -662,6 +669,122 @@ button svg {
   min-height: 32px;
 }
 
+/* ===== 自进化面板 ===== */
+.evolution-dialog {
+  width: min(820px, 100%);
+}
+.evolution-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.evolution-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.evolution-intent {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+.evolution-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+.evolution-item {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.evolution-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.evolution-item-head strong {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.evolution-status {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--muted);
+}
+.evolution-status.pending {
+  background: var(--mint-soft);
+  color: #267c65;
+}
+.evolution-status.applied {
+  background: #e6f3ea;
+  color: #248b68;
+}
+.evolution-status.rejected {
+  background: #faeaea;
+  color: var(--danger);
+}
+.evolution-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.evolution-meta .danger {
+  color: var(--danger);
+}
+.evolution-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.evolution-actions button {
+  font-size: 11px;
+  min-height: 28px;
+}
+.evolution-item details {
+  margin-top: 12px;
+  font-size: 12px;
+}
+.evolution-item summary {
+  cursor: pointer;
+  color: var(--text);
+  padding-block: 4px;
+}
+.evolution-item details p {
+  color: var(--muted);
+  margin-block: 8px;
+}
+.evolution-diff pre,
+.evolution-evidence pre {
+  background: var(--surface);
+  padding: 10px;
+  max-height: 300px;
+  overflow: auto;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+.evolution-response {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.evolution-commit {
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 @media (max-width: 460px) {
   .persona-status {
     display: none;
@@ -671,3 +794,124 @@ button svg {
   }
 }
 
+/* ===== 外观偏好：主题与字号 ===== */
+:root[data-theme="dark"] {
+  color: #e3e7e4;
+  background: #14181b;
+  --text: #e3e7e4;
+  --muted: #8d98a1;
+  --line: #2a3137;
+  --surface: #1a1f23;
+  --mint: #46c9b6;
+  --mint-soft: #16302c;
+  --danger: #e0857a;
+  color-scheme: dark;
+}
+:root[data-theme="dark"] .window-bar,
+:root[data-theme="dark"] .conversation-main,
+:root[data-theme="dark"] .composer,
+:root[data-theme="dark"] .dialog {
+  background: #1a1f23;
+}
+:root[data-theme="dark"] .composer {
+  border-color: #2a3137;
+}
+:root[data-theme="dark"] button:hover {
+  background: #232a2f;
+}
+:root[data-theme="dark"] .notice {
+  background: #2a211c;
+  color: #e0a08c;
+  border-bottom-color: #3a2c25;
+}
+:root[data-font-size="small"] body {
+  zoom: 0.92;
+}
+:root[data-font-size="large"] body {
+  zoom: 1.1;
+}
+.preferences {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.preferences label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+
+/* ===== 首次连接引导 ===== */
+.onboarding-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.guide-hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.preset-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  text-align: left;
+  min-height: 0;
+}
+.preset-card:hover {
+  border-color: var(--mint);
+}
+.preset-card strong {
+  font-size: 13px;
+}
+.preset-card span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ===== 任务步骤 ===== */
+.todo-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.todo-list li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.todo-list li .dot {
+  flex-shrink: 0;
+}
+.todo-list li.completed span {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.todo-list li.in_progress span {
+  color: var(--text);
+  font-weight: 600;
+}

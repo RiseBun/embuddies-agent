@@ -133,7 +133,7 @@ export function Resources({
         ))}
         {!filtered.length && (
           <span className="resource-empty">
-            {search ? "没有匹配的资源" : "添加 Skill、Agent 或插件"}
+            {search ? "没有匹配的资源" : "添加资源"}
           </span>
         )}
       </div>

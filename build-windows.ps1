@@ -39,6 +39,8 @@ $stage=Join-Path $candidateRoot 'windows'
 New-Item -ItemType Directory -Path $stage -Force|Out-Null
 Get-ChildItem -LiteralPath $electronRoot|Copy-Item -Destination $stage -Recurse -Force
 Rename-Item -LiteralPath (Join-Path $stage 'electron.exe') -NewName 'embuddies.exe'
+if (-not ('EmbuddiesIconResources' -as [type])) { Add-Type -Path (Join-Path $projectRoot 'launcher\IconResources.cs') }
+[EmbuddiesIconResources]::SetIcon((Join-Path $stage 'embuddies.exe'), (Join-Path $projectRoot 'shell\resources\icons\appIcon.ico'))
 function Assert-ExecutableIntegrity([string]$file){
   $acl=& icacls.exe $file
   if($LASTEXITCODE -ne 0){throw 'Unable to inspect executable integrity label.'}
@@ -67,6 +69,18 @@ if($nativeRoot){
 New-Item -ItemType Directory -Path (Join-Path $appRoot 'shell') -Force|Out-Null
 New-Item -ItemType Directory -Path (Join-Path $appRoot 'shell\resources') -Force|Out-Null
 Copy-Item -LiteralPath (Join-Path $projectRoot 'shell\resources\icons') -Destination (Join-Path $appRoot 'shell\resources') -Recurse
+# 受限执行器：编译并随包分发，运行命令时使用 Windows Job Object。
+$sandboxSource=Join-Path $projectRoot 'launcher\SandboxRunner.cs'
+$sandboxExe=Join-Path $projectRoot 'launcher\sandbox-run.exe'
+$csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+if((Test-Path $csc) -and (Test-Path $sandboxSource)){
+  & $csc /nologo '/target:exe' "/out:$sandboxExe" $sandboxSource
+  if($LASTEXITCODE -ne 0){throw 'Sandbox runner build failed.'}
+}
+if(Test-Path $sandboxExe){
+  New-Item -ItemType Directory -Path (Join-Path $appRoot 'bin') -Force|Out-Null
+  Copy-Item -LiteralPath $sandboxExe -Destination (Join-Path $appRoot 'bin\sandbox-run.exe') -Force
+}
 Push-Location $stageRuntime
 try{
   if($npmCommand){& $npmCommand.Source ci --omit=dev --ignore-scripts --no-audit --no-fund}

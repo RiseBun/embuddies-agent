@@ -1,5 +1,12 @@
 param([switch]$VerifyOnly)
 $ErrorActionPreference='Stop'
+trap {
+  $launchLog=Join-Path $env:LOCALAPPDATA 'embuddies\logs\startup.log'
+  [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($launchLog))|Out-Null
+  [IO.File]::AppendAllText($launchLog,([DateTime]::Now.ToString('s')+' '+$_.Exception.Message+[Environment]::NewLine))
+  [Console]::Error.WriteLine($_.Exception.Message)
+  exit 1
+}
 $selection=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'native-engine\desktop-candidate.json') -Raw|ConvertFrom-Json
 $candidate=[IO.Path]::GetFullPath($selection.path)
 $manifest=Get-Content -LiteralPath (Join-Path $candidate 'release-manifest.json') -Raw|ConvertFrom-Json
@@ -21,7 +28,7 @@ $trialRoot=Join-Path $env:LOCALAPPDATA 'embuddies-candidate'
 $env:EMBUDDIES_DATA_DIR=Join-Path $trialRoot 'data'
 $profile=Join-Path $trialRoot 'profile'
 New-Item -ItemType Directory -Path $profile -Force|Out-Null
-foreach($name in @('EMBUDDIES_NATIVE_EXECUTABLE','EMBUDDIES_RUNTIME_ROOT','EMBUDDIES_UI_ROOT','EMBUDDIES_BUNDLE_ROOT','EMBUDDIES_IPC_DEBUG')){
+foreach($name in @('ELECTRON_RUN_AS_NODE','EMBUDDIES_NATIVE_EXECUTABLE','EMBUDDIES_RUNTIME_ROOT','EMBUDDIES_UI_ROOT','EMBUDDIES_BUNDLE_ROOT','EMBUDDIES_IPC_DEBUG')){
   [Environment]::SetEnvironmentVariable($name,$null,'Process')
 }
 Start-Process -FilePath $exe -ArgumentList ('"--user-data-dir='+$profile+'"') -WorkingDirectory $candidate -WindowStyle Hidden

@@ -9,6 +9,9 @@ import {
   Trash2,
   Activity,
   Minus,
+  Wrench,
+  ShieldCheck,
+  User,
 } from "lucide-react";
 import type {
   Layer,
@@ -16,12 +19,15 @@ import type {
   Conversation,
   Turn,
   Json,
-  Health,
   Channel,
 } from "./types";
 import { CreationForm, ModelForm, ResourceForm, Dialog } from "./Forms";
 import { labels } from "./Resources";
 import { ApprovalCard } from "./ApprovalCard";
+import { EvolutionPanel } from "./EvolutionPanel";
+import { PreferencesForm } from "./PreferencesForm";
+import { Onboarding } from "./Onboarding";
+import { ProfileForm } from "./ProfileForm";
 import { request, host } from "./api";
 type Props = {
   layer: Layer | null;
@@ -42,10 +48,7 @@ type Props = {
   channel?: Channel;
   current?: Conversation;
   load: (id: string) => Promise<void>;
-  health?: Health;
   approvals: Json[];
-  personaName: string;
-  setPersonaName: Dispatch<SetStateAction<string>>;
 };
 export function WorkbenchLayers({
   layer,
@@ -66,10 +69,7 @@ export function WorkbenchLayers({
   channel,
   current,
   load,
-  health,
   approvals,
-  personaName,
-  setPersonaName,
 }: Props) {
   return (
     <>
@@ -276,18 +276,21 @@ export function WorkbenchLayers({
       {layer?.kind === "settings" && (
         <Dialog title="设置" onClose={() => setLayer(null)}>
           <div className="settings-options">
-            <label className="persona-rename">
-              <span>形象名字</span>
-              <input
-                value={personaName}
-                maxLength={40}
-                aria-label="形象名字"
-                onChange={(e) => setPersonaName(e.target.value)}
-              />
-            </label>
             <button onClick={() => setLayer({ kind: "model" })}>
               <Settings size={16} />
               模型与连接
+            </button>
+            <button onClick={() => setLayer({ kind: "profile" })}>
+              <User size={16} />
+              我的 agent
+            </button>
+            <button onClick={() => setLayer({ kind: "self-improve" })}>
+              <Wrench size={16} />
+              应用改进
+            </button>
+            <button onClick={() => setLayer({ kind: "approvals" })}>
+              <ShieldCheck size={16} />
+              待处理审批
             </button>
             <button
               onClick={() => window.EMBUDDIES_DESKTOP?.exportDiagnostics()}
@@ -299,12 +302,8 @@ export function WorkbenchLayers({
               <Minus size={16} />
               使用悬浮球
             </button>
-            <div className="capability-list">
-              {health?.capabilities.map((c) => (
-                <code key={c}>{c}</code>
-              ))}
-            </div>
           </div>
+          <PreferencesForm />
         </Dialog>
       )}
       {layer?.kind === "approvals" && (
@@ -320,6 +319,17 @@ export function WorkbenchLayers({
               await refresh();
             }}
           />
+        </Dialog>
+      )}
+      {layer?.kind === "self-improve" && (
+        <EvolutionPanel onClose={() => setLayer(null)} onApplied={refresh} />
+      )}
+      {layer?.kind === "onboarding" && (
+        <Onboarding onClose={() => setLayer(null)} onDone={refresh} />
+      )}
+      {layer?.kind === "profile" && (
+        <Dialog title="我的 agent" onClose={() => setLayer(null)}>
+          <ProfileForm />
         </Dialog>
       )}
     </>

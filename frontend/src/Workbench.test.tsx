@@ -34,9 +34,7 @@ describe("goal-first workbench", () => {
   it("opens on the goal composer and keeps the optional resource library available", async () => {
     const { unmount } = render(<Workbench />);
     await waitFor(() => expect(request).toHaveBeenCalledWith("/resources"));
-    expect(
-      screen.getByPlaceholderText("告诉 embuddies 你想完成什么"),
-    ).toBeDefined();
+    expect(screen.getByPlaceholderText("你想做什么？")).toBeDefined();
     expect(screen.queryByLabelText("资源库")).toBeNull();
     const toggle = screen.getByRole("button", { name: "资源与能力" });
     fireEvent.click(toggle);
@@ -160,9 +158,7 @@ describe("goal-first workbench", () => {
       return fallback(path, ...args);
     });
     render(<Workbench />);
-    await screen.findByText("还没有配置模型连接");
-    expect(
-      screen.getByRole("button", { name: "配置模型与连接" }),
-    ).toBeDefined();
+    await screen.findByText("连接模型即可开始");
+    expect(screen.getByRole("button", { name: "连接模型" })).toBeDefined();
   });
 });

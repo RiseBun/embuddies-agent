@@ -1,0 +1,21 @@
+{
+  "paths": [
+    "desktop/",
+    "runtime/permissions/",
+    "runtime/approval-broker.mjs",
+    "runtime/native-request-broker.mjs",
+    "runtime/secret-store.mjs",
+    "runtime/self-improve.mjs",
+    "runtime/self-improve-service.mjs",
+    "runtime/self-improve-policy.mjs",
+    "runtime/immutable-core.json",
+    "runtime/embuddies-runtime.mjs",
+    "runtime/application-service.mjs",
+    "frontend/src/EvolutionPanel.tsx",
+    "frontend/src/WorkbenchLayers.tsx",
+    "frontend/src/Workbench.tsx",
+    ".gitignore",
+    ".gitattributes",
+    ".github/"
+  ]
+}

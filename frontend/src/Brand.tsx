@@ -1,29 +1,37 @@
 import { useEffect, useRef, useState } from "react";
 import { host } from "./api";
+import { usePetAnimation } from "./usePetAnimation";
 export function Brand({
   size = 36,
   animated = false,
+  followPointer = false,
 }: {
   size?: number;
   animated?: boolean;
+  followPointer?: boolean;
 }) {
+  const svg = useRef<SVGSVGElement>(null);
+  usePetAnimation(svg, animated && followPointer);
   return (
     <svg
+      ref={svg}
       width={size}
       height={size}
       viewBox="35 18 250 224"
       role="img"
       aria-label="embuddies"
-      className={animated ? "brand animated" : "brand"}
+      className={`brand${animated ? " animated" : ""}${followPointer ? " interactive" : ""}`}
     >
-      <path
-        fill="currentColor"
-        fillRule="evenodd"
-        d="M158 29 C224 28 271 69 272 126 C273 184 226 226 161 229 C96 230 48 188 48 130 C47 72 93 32 158 29 Z M158 37 C99 40 56 76 56 130 C56 180 102 216 161 216 C220 213 264 177 264 126 C263 75 218 36 158 37 Z"
-      />
-      <g className="eyes" fill="currentColor">
-        <ellipse cx="126" cy="128" rx="25" ry="25" />
-        <ellipse cx="194" cy="128" rx="25" ry="25" />
+      <g className="pet-shape">
+        <path
+          fill="currentColor"
+          fillRule="evenodd"
+          d="M158 29 C224 28 271 69 272 126 C273 184 226 226 161 229 C96 230 48 188 48 130 C47 72 93 32 158 29 Z M158 37 C99 40 56 76 56 130 C56 180 102 216 161 216 C220 213 264 177 264 126 C263 75 218 36 158 37 Z"
+        />
+        <g className="eyes" fill="currentColor">
+          <ellipse cx="126" cy="128" rx="25" ry="25" />
+          <ellipse cx="194" cy="128" rx="25" ry="25" />
+        </g>
       </g>
     </svg>
   );
@@ -97,7 +105,7 @@ export function Pet() {
           drag.current = null;
         }}
       >
-        <Brand size={205} animated />
+        <Brand size={205} animated followPointer />
       </div>
       {menu && (
         <div className="pet-menu" onClick={(e) => e.stopPropagation()}>

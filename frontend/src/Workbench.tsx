@@ -10,15 +10,14 @@ import {
   GitCompare,
   Activity,
   ArrowUp,
-  Copy,
   ShieldCheck,
   ChevronDown,
 } from "lucide-react";
 import { request, host } from "./api";
+import { loadPreferences, savePreferences } from "./preferences";
 import { useDismiss, useSize } from "./interaction";
 import { Resources } from "./Resources";
 import { Messages } from "./Messages";
-import { Persona } from "./Persona";
 import { Sidebar } from "./Sidebar";
 import { Inspector } from "./Inspector";
 import { WorkbenchLayers } from "./WorkbenchLayers";
@@ -61,9 +60,20 @@ export function Workbench() {
     [formDrafts, setFormDrafts] = useState<Record<string, Json>>({}),
     [layer, setLayer] = useState<Layer | null>(null),
     [approvals, setApprovals] = useState<Json[]>([]),
-    [personaName, setPersonaName] = useState(
-      localStorage.getItem("embuddies:persona-name") || "embuddies",
-    );
+    [autoApprove, setAutoApprove] = useState(false);
+  useEffect(() => {
+    loadPreferences()
+      .then((prefs) => setAutoApprove(prefs.autoApprove))
+      .catch(() => {});
+  }, []);
+  const toggleAutoApprove = async () => {
+    try {
+      const next = await savePreferences({ autoApprove: !autoApprove });
+      setAutoApprove(next.autoApprove);
+    } catch {
+      // 失败时保持原状态，设置页会显示具体错误。
+    }
+  };
   const [right, setRight] = useState(""),
     [run, setRun] = useState<Json>(),
     [showResources, setShowResources] = useState(
@@ -175,9 +185,6 @@ export function Workbench() {
     localStorage.setItem("embuddies:show-resources", String(showResources));
   }, [showResources]);
   useEffect(() => {
-    localStorage.setItem("embuddies:persona-name", personaName);
-  }, [personaName]);
-  useEffect(() => {
     localStorage.setItem("embuddies:conversation", selectedId);
     setCurrent(undefined);
     if (selectedId) load(selectedId).catch((e) => setError(e.message));
@@ -272,15 +279,6 @@ export function Workbench() {
   ) => {
     await request("/approval/decide", { requestId, outcome, answers });
     await refresh();
-  };
-  const openActivity = () => {
-    if (right === "trace") {
-      setRight("");
-      return;
-    }
-    const t = current?.turns?.at(-1);
-    if (t && t.runId) showRun(t);
-    else setRight("trace");
   };
   const send = async () => {
     const text = (drafts[selectedId] || "").trim();
@@ -386,9 +384,6 @@ export function Workbench() {
       for (const owned of ownedKeys) sending.current.delete(owned);
     }
   };
-  const state = ["recovering", "failed", "needs_attention"].includes(hostState)
-    ? hostState
-    : health?.state || hostState;
   const menu = (w: Workspace, e: React.MouseEvent) => {
     e.preventDefault();
     setLayer({
@@ -429,20 +424,13 @@ export function Workbench() {
   return (
     <div className="workbench">
       <header className="window-bar">
-        <div className="wordmark">
-          embuddies
-          <span className="brand-point" />
-        </div>
+        <div className="wordmark">embuddies</div>
         <div className="window-drag" />
-        <Persona
-          name={personaName}
-          state={state}
-          live={live}
-          onOpenActivity={openActivity}
-        />
+        {busy && <i className="dot running-dot" aria-label="正在处理" />}
         <button
           className={showResources ? "active" : ""}
           aria-label="资源与能力"
+          title="资源与能力"
           aria-expanded={showResources}
           aria-controls="workbench-resources"
           onClick={() => {
@@ -455,12 +443,12 @@ export function Workbench() {
           }}
         >
           <Layers size={15} />
-          能力
         </button>
         <button
           className="icon-button"
           data-trigger
           aria-label="全局设置"
+          title="设置"
           onClick={() => setLayer({ kind: "settings" })}
         >
           <Settings size={16} />
@@ -534,7 +522,9 @@ export function Workbench() {
             setSidebar={setSidebar}
           />
         )}
-        <main className="conversation-main">
+        <main
+          className={`conversation-main${!live && !current?.turns?.length ? " is-empty" : ""}`}
+        >
           <header className="conversation-header">
             {!sidebar && (
               <button
@@ -547,27 +537,17 @@ export function Workbench() {
             )}
             <h1>{current?.title || workspace?.name || "新对话"}</h1>
             <div className="header-actions">
-              <button
-                data-trigger
-                onClick={() => setLayer({ kind: "approvals" })}
-              >
-                <ShieldCheck size={15} />
-                审批
-                {approvals.length > 0 && (
+              {approvals.length > 0 && (
+                <button
+                  data-trigger
+                  aria-label="待处理审批"
+                  title="待处理审批"
+                  onClick={() => setLayer({ kind: "approvals" })}
+                >
+                  <ShieldCheck size={15} />
                   <span className="count">{approvals.length}</span>
-                )}
-              </button>
-              <button
-                title="复制回复"
-                onClick={() =>
-                  host("clipboard.writeText", [
-                    live?.reply || current?.turns?.at(-1)?.reply || "",
-                  ])
-                }
-              >
-                <Copy size={14} />
-                复制
-              </button>
+                </button>
+              )}
             </div>
           </header>
           {error && (
@@ -592,17 +572,12 @@ export function Workbench() {
           )}
           {health && health.authConfigured === false && (
             <div className="onboarding" role="status">
-              <div className="onboarding-text">
-                <strong>还没有配置模型连接</strong>
-                <span>
-                  选择一个渠道、填入 API Key 并测试连接，就可以开始使用了。
-                </span>
-              </div>
+              <span className="onboarding-text">连接模型即可开始</span>
               <button
                 className="primary"
-                onClick={() => setLayer({ kind: "model" })}
+                onClick={() => setLayer({ kind: "onboarding" })}
               >
-                配置模型与连接
+                连接模型
               </button>
             </div>
           )}
@@ -611,6 +586,7 @@ export function Workbench() {
             turns={current?.turns || []}
             live={live}
             onRun={showRun}
+            onCopy={(t) => act(() => host("clipboard.writeText", [t.reply]))}
             approvals={approvals}
             onDecide={decideApproval}
           />
@@ -628,7 +604,7 @@ export function Workbench() {
                 onChange={(e) =>
                   setDrafts((d) => ({ ...d, [selectedId]: e.target.value }))
                 }
-                placeholder="告诉 embuddies 你想完成什么"
+                placeholder="你想做什么？"
                 rows={3}
                 maxLength={128000}
                 onKeyDown={(e) => {
@@ -675,6 +651,17 @@ export function Workbench() {
                   <option value="read-only">只读</option>
                   <option value="workspace-write">工作区写入</option>
                 </select>
+                <button
+                  type="button"
+                  data-trigger
+                  className={autoApprove ? "active" : ""}
+                  title="自动审批：开启后不再逐个确认"
+                  aria-pressed={autoApprove}
+                  onClick={() => void toggleAutoApprove()}
+                >
+                  <ShieldCheck size={13} />
+                  {autoApprove ? "自动" : "手动"}
+                </button>
                 <div className="composer-spacer" />
                 {busy ? (
                   <button
@@ -702,25 +689,29 @@ export function Workbench() {
             <div className="inspect-tools">
               <button
                 className={right === "composition" ? "active" : ""}
+                aria-label="组合"
+                title="组合"
                 onClick={() =>
                   setRight(right === "composition" ? "" : "composition")
                 }
               >
                 <Layers size={14} />
-                组合
                 {workspace?.resourceIds.length
                   ? ` ${workspace.resourceIds.length}`
                   : ""}
               </button>
               <button
                 className={right === "browser" ? "active" : ""}
+                aria-label="浏览器"
+                title="浏览器"
                 onClick={() => setRight(right === "browser" ? "" : "browser")}
               >
                 <Globe size={14} />
-                浏览器
               </button>
               <button
                 className={right === "diff" ? "active" : ""}
+                aria-label="变化"
+                title="变化"
                 onClick={() => {
                   setRight(right === "diff" ? "" : "diff");
                   const t = current?.turns?.at(-1);
@@ -732,10 +723,11 @@ export function Workbench() {
                 }}
               >
                 <GitCompare size={14} />
-                变化
               </button>
               <button
                 className={right === "trace" ? "active" : ""}
+                aria-label="执行记录"
+                title="执行记录"
                 onClick={() => {
                   if (right === "trace") setRight("");
                   else {
@@ -746,7 +738,6 @@ export function Workbench() {
                 }}
               >
                 <Activity size={14} />
-                轨迹
               </button>
             </div>
           </div>
@@ -789,10 +780,7 @@ export function Workbench() {
         channel={channel}
         current={current}
         load={load}
-        health={health}
         approvals={approvals}
-        personaName={personaName}
-        setPersonaName={setPersonaName}
       />
     </div>
   );

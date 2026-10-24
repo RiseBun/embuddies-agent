@@ -185,7 +185,7 @@ export function Sidebar({
             ))}
         </div>
         <div className="sidebar-bottom">
-          <span>{workspaces.length} 个工作区</span>
+          <span />
           <button
             className="icon-button"
             title="收起左栏"

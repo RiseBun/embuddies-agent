@@ -16,6 +16,7 @@ const {
 } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
+const { spawn } = require("node:child_process");
 const { pathToFileURL } = require("node:url");
 const { RuntimeSupervisor } = require("./runtime-supervisor.cjs");
 const { createRedactor } = require("./diagnostics.cjs");
@@ -26,9 +27,7 @@ const distributionPath = path.join(bundleRoot, "distribution.json");
 const distribution = fs.existsSync(distributionPath)
   ? // Strip a UTF-8 BOM: JSON.parse rejects it and a packaged build must not
     // fail to start because of a file encoding artifact.
-    JSON.parse(
-      fs.readFileSync(distributionPath, "utf8").replace(/^\uFEFF/, ""),
-    )
+    JSON.parse(fs.readFileSync(distributionPath, "utf8").replace(/^\uFEFF/, ""))
   : { channel: "development" };
 const namespace =
   distribution.channel === "candidate" ? "embuddies-candidate" : "embuddies";
@@ -162,6 +161,29 @@ async function browserRequest({ action, sessionId, args = [] }) {
     return browserRuntime.command({ ...args[0], workspaceId: sessionId }, true);
   throw new Error("未启用的浏览器操作");
 }
+// 自改进应用后重建前端并刷新窗口；仅开发版有源码与构建依赖时可用。
+function runFrontendBuild() {
+  const frontend = path.join(bundleRoot, "frontend");
+  const tsc = path.join(frontend, "node_modules", "typescript", "bin", "tsc");
+  const vite = path.join(frontend, "node_modules", "vite", "bin", "vite.js");
+  if (!fs.existsSync(tsc) || !fs.existsSync(vite))
+    return Promise.reject(new Error("当前版本缺少前端构建依赖，无法重建界面"));
+  const run = (args) =>
+    new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, args, {
+        cwd: frontend,
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+        windowsHide: true,
+        stdio: "ignore",
+      });
+      child.on("error", reject);
+      child.on("exit", (code) =>
+        code === 0 ? resolve() : reject(new Error(`前端构建失败（${code}）`)),
+      );
+    });
+  return run([tsc, "--noEmit"]).then(() => run([vite, "build"]));
+}
+
 async function hostRequest(operation, values) {
   if (operation === "crypto") {
     if (!safeStorage.isEncryptionAvailable())
@@ -260,7 +282,10 @@ function createWindow(kind) {
     y: isPanel ? undefined : Math.round(workArea.y + workArea.height - 280),
     center: isPanel,
     title: isPanel ? "embuddies" : "embuddies",
-    icon: path.join(iconRoot, "appIcon.png"),
+    icon: path.join(
+      iconRoot,
+      process.platform === "win32" ? "appIcon.ico" : "appIcon.png",
+    ),
     frame: false,
     transparent: !isPanel,
     backgroundColor: isPanel ? "#ffffff" : "#00000000",
@@ -386,6 +411,16 @@ ipcMain.handle("embuddies:host", async (event, method, values) => {
   const args = Array.isArray(values) ? values : [];
   const scale = displayScale(win);
   switch (method) {
+    case "window.getPointer": {
+      const cursor = screen.getCursorScreenPoint();
+      const bounds = win.getBounds();
+      return {
+        x: cursor.x - bounds.x,
+        y: cursor.y - bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+      };
+    }
     case "browser.command":
       return browserRuntime.command(args[0]);
     case "browser.present":
@@ -496,6 +531,10 @@ ipcMain.handle("embuddies:host", async (event, method, values) => {
     case "window.unmaximize":
       win.unmaximize();
       return null;
+    case "app.rebuildAndReload":
+      await runFrontendBuild();
+      win.webContents.reload();
+      return { ok: true };
     default:
       throw new Error(`不支持的窗口操作：${method}`);
   }

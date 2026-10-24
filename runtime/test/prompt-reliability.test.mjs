@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import vm from "node:vm";
 import { assistantOutput } from "../assistant-output.mjs";
 import { normalizeRuntimeEvent } from "../event-normalizer.mjs";
+import { compactHistory, formatTurn } from "../context-compression.mjs";
 
 // Execute the production request handler with isolated stores and runtime.
 const source = await fs.readFile(
@@ -42,6 +43,14 @@ function harness(run) {
     configStore: {
       read: async () => ({ channels: { test: { apiKey: "fixture" } } }),
     },
+    profileStore: {
+      read: async () => ({ name: "test", tone: "concise", systemPrompt: "" }),
+    },
+    preferencesStore: {
+      read: async () => ({ autoApprove: false, sandboxMode: "standard" }),
+    },
+    compactHistory,
+    formatTurn,
     commit: async (fn) => fn(),
     crypto: { randomUUID: () => "run-fixture" },
     fs: { promises: { stat: async () => ({ isDirectory: () => true }) } },
