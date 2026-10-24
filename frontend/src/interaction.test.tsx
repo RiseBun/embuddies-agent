@@ -138,7 +138,7 @@ describe("workbench interactions", () => {
         onCopy={() => {}}
       />,
     );
-    expect(screen.getByRole("status").textContent).toContain("embuddies正在运行");
+    expect(screen.getByRole("status").textContent).toContain("正在处理");
     rerender(
       <Messages
         id="c"

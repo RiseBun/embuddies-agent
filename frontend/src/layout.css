@@ -451,6 +451,20 @@
   color: #8a929a;
   font-size: 11px;
 }
+.running-status-text {
+  animation: running-status-pulse 1.35s ease-in-out infinite;
+}
+@keyframes running-status-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
 .process {
   font-size: 11px;
   color: var(--muted);

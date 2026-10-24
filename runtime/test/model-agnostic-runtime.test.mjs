@@ -58,6 +58,24 @@ function toolStream(name, args) {
   ]);
 }
 
+function interruptedStream() {
+  return {
+    ok: true,
+    status: 200,
+    headers: {
+      get: (name) =>
+        String(name).toLowerCase() === "content-type"
+          ? "text/event-stream"
+          : null,
+    },
+    body: new ReadableStream({
+      start(controller) {
+        controller.error(new Error("gateway closed the stream"));
+      },
+    }),
+  };
+}
+
 test("model-agnostic runtime executes a tool and returns the final answer", async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "embuddies-runtime-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
@@ -106,6 +124,39 @@ test("model-agnostic runtime executes a tool and returns the final answer", asyn
     result.events.some((e) => e.type === "assistant_delta"),
     "should stream assistant deltas",
   );
+  await runtime.close();
+});
+
+test("a failed tool and one interrupted follow-up stream do not end the conversation", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "embuddies-recover-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    if (calls === 1) return toolStream("read_file", { path: "missing.txt" });
+    if (calls === 2) return interruptedStream();
+    return textStream("工具失败后仍可继续");
+  };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const runtime = new EmbuddiesRuntime({}, {});
+  const result = await runtime.run("读取不存在的文件并继续", {
+    sessionId: "recover-1",
+    workspace: root,
+    channel: {
+      api: "openai-completions",
+      baseURL: "https://example.com/v1",
+      apiKey: "test",
+      model: "test-model",
+    },
+  });
+
+  assert.equal(result.finalResponse, "工具失败后仍可继续");
+  assert.equal(calls, 3);
+  assert.ok(result.events.some((event) => event.type === "tool_end" && event.failed));
   await runtime.close();
 });
 

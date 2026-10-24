@@ -87,4 +87,6 @@ export function safeEnvironment(base = process.env) {
   return env;
 }
 
+// Keep individual commands bounded; a failed tool call must be returned to the
+// model so the conversation can choose another route or continue.
 export const COMMAND_TIMEOUT_MS = 120_000;

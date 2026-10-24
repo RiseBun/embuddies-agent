@@ -205,11 +205,7 @@ export function Messages({
               <div className="assistant-content">
                 <Process events={t.events || []} />
                 <TodoList events={t.events || []} />
-                {t.reply ? (
-                  <Markdown text={t.reply} />
-                ) : t.status === "running" ? (
-                  <span className="thinking">正在处理…</span>
-                ) : null}
+                {t.reply ? <Markdown text={t.reply} /> : null}
                 {t.error && <div className="error-line">{t.error}</div>}
                 {t.status !== "running" && (
                   <div className="message-actions">
@@ -266,7 +262,7 @@ export function Messages({
         {all.some((turn) => turn.status === "running") && (
           <div className="running-status" role="status" aria-live="polite">
             <i className="dot running-dot" />
-            embuddies正在运行
+            <span className="running-status-text">正在处理…</span>
           </div>
         )}
       </div>

@@ -764,6 +764,7 @@ export class EmbuddiesRuntime {
     signal,
     allowRetry = true,
     onDelta = null,
+    streamRetry = 0,
   ) {
     const transport = resolveModelTransport(channel);
     const isAnthropic = transport.protocol === "anthropic";
@@ -856,14 +857,36 @@ export class EmbuddiesRuntime {
         "text/event-stream",
       );
     if (eventStream) {
+      let streamed = false;
+      const forwardDelta = (delta) => {
+        streamed = true;
+        onDelta?.(delta);
+      };
       try {
         if (isResponses)
-          return await readResponsesStream(readSSE(response), onDelta);
+          return await readResponsesStream(readSSE(response), forwardDelta);
         return isAnthropic
-          ? await readAnthropicStream(response, onDelta)
-          : await readOpenAIStream(response, onDelta);
+          ? await readAnthropicStream(response, forwardDelta)
+          : await readOpenAIStream(response, forwardDelta);
       } catch (error) {
         if (signal.aborted) throw signal.reason || error;
+        // A tool failure is valid input for the next model turn. Some gateways
+        // close that follow-up stream once before accepting the same request;
+        // retry when no assistant text was delivered so a recoverable timeout
+        // does not terminate the whole conversation.
+        if (!streamed && streamRetry < 2) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          signal.throwIfAborted();
+          return this.#request(
+            channel,
+            messages,
+            tools,
+            signal,
+            false,
+            onDelta,
+            streamRetry + 1,
+          );
+        }
         throw new Error("模型服务响应中断，历史记录已保留", { cause: error });
       }
     }
@@ -1474,7 +1497,7 @@ export class EmbuddiesRuntime {
           messages,
           tools,
           controller.signal,
-          allowModelRetry && round === 0,
+          allowModelRetry,
           (delta) => emit({ type: "assistant_delta", itemId: "answer", delta }),
         );
         if (result.text) {
