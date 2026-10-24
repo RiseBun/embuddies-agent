@@ -88,8 +88,7 @@ export function Process({ events }: { events: Json[] }) {
           done: true,
         });
       } else {
-        rows[at].result =
-          typeof event.detail === "string" ? event.detail : "";
+        rows[at].result = typeof event.detail === "string" ? event.detail : "";
         rows[at].failed = Boolean(event.failed);
         rows[at].done = true;
       }
@@ -262,6 +261,12 @@ export function Messages({
                 onDecide={onDecide}
               />
             ))}
+          </div>
+        )}
+        {all.some((turn) => turn.status === "running") && (
+          <div className="running-status" role="status" aria-live="polite">
+            <i className="dot running-dot" />
+            embuddies正在运行
           </div>
         )}
       </div>

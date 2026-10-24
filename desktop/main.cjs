@@ -484,6 +484,13 @@ ipcMain.handle("embuddies:host", async (event, method, values) => {
       });
       return choice.canceled ? "" : choice.filePaths[0] || "";
     }
+    case "os.showFileDialog": {
+      const choice = await dialog.showOpenDialog(win, {
+        title: String(args[0] || "添加文件"),
+        properties: ["openFile", "multiSelections"],
+      });
+      return choice.canceled ? [] : choice.filePaths;
+    }
     case "window.beginDrag":
       return null;
     case "window.create":

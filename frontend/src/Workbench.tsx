@@ -10,6 +10,8 @@ import {
   GitCompare,
   Activity,
   ArrowUp,
+  Plus,
+  Paperclip,
   ShieldCheck,
   ChevronDown,
 } from "lucide-react";
@@ -57,6 +59,13 @@ export function Workbench() {
     );
   const [active, setActive] = useState<Record<string, Turn>>({}),
     [drafts, setDrafts] = useState<Record<string, string>>({}),
+    [attachments, setAttachments] = useState<
+      Record<string, { path: string; name: string }[]>
+    >({}),
+    [composerMode, setComposerMode] = useState<"act" | "plan">("act"),
+    [composerPermission, setComposerPermission] = useState<
+      "read-only" | "workspace-write"
+    >("read-only"),
     [formDrafts, setFormDrafts] = useState<Record<string, Json>>({}),
     [layer, setLayer] = useState<Layer | null>(null),
     [approvals, setApprovals] = useState<Json[]>([]),
@@ -93,6 +102,12 @@ export function Workbench() {
     (c) => c.id === (current?.channel || health?.channel),
   );
   const model = current?.model || channel?.model || "";
+  const selectedAttachments = attachments[selectedId || "new"] || [];
+  useEffect(() => {
+    if (!current) return;
+    setComposerMode(current.mode === "plan" ? "plan" : "act");
+    setComposerPermission(current.permissionMode || "read-only");
+  }, [current?.id]);
   const refresh = useCallback(async () => {
     const [h, r, c, a] = await Promise.all([
       request("/health"),
@@ -198,7 +213,14 @@ export function Workbench() {
     setWorkspaceId(w.id);
     setSelectedId(conversations.find((c) => c.workspaceId === w.id)?.id || "");
   };
-  const createChat = async (name = "", w = workspace) => {
+  const createChat = async (
+    name = "",
+    w = workspace,
+    options: {
+      mode?: "act" | "plan";
+      permissionMode?: "read-only" | "workspace-write";
+    } = {},
+  ) => {
     const r = await request("/conversations/create", {
       id: "conversation-" + crypto.randomUUID(),
       type: "chat",
@@ -208,6 +230,14 @@ export function Workbench() {
       await request("/conversations/update", {
         id: r.conversation.id,
         title: name,
+      });
+    if (options.mode || options.permissionMode)
+      await request("/conversations/update", {
+        id: r.conversation.id,
+        ...(options.mode ? { mode: options.mode } : {}),
+        ...(options.permissionMode
+          ? { permissionMode: options.permissionMode }
+          : {}),
       });
     await refresh();
     choose(r.conversation);
@@ -221,6 +251,27 @@ export function Workbench() {
     });
     setCurrent(r.conversation);
     await refresh();
+  };
+  const changeComposerMode = (value: "act" | "plan") => {
+    setComposerMode(value);
+    if (current) void act(() => updateConversation({ mode: value }));
+  };
+  const changeComposerPermission = (value: "read-only" | "workspace-write") => {
+    setComposerPermission(value);
+    if (current) void act(() => updateConversation({ permissionMode: value }));
+  };
+  const addAttachments = async () => {
+    const paths = await host("os.showFileDialog", ["添加文件"]);
+    if (!Array.isArray(paths) || !paths.length) return;
+    const key = selectedId || "new";
+    const files = paths
+      .filter((path): path is string => typeof path === "string" && !!path)
+      .map((path) => ({ path, name: path.split(/[\\/]/).pop() || path }));
+    setAttachments((previous) => ({
+      ...previous,
+      [key]: [...(previous[key] || []), ...files].slice(0, 8),
+    }));
+    setLayer(null);
   };
   const attach = async (resource: Resource, w = workspace) => {
     if (!w) throw new Error("请先选择一个工作区");
@@ -297,7 +348,11 @@ export function Workbench() {
         c = r.conversation as Conversation | undefined;
         if (!c) throw new Error("当前对话未能加载，请稍后重试");
       }
-      if (!c) c = await createChat();
+      if (!c)
+        c = await createChat("", workspace, {
+          mode: composerMode,
+          permissionMode: composerPermission,
+        });
       id = c.id;
       if (!ownedKeys.includes(id)) {
         if (sending.current.has(id)) return;
@@ -315,10 +370,22 @@ export function Workbench() {
       setActive((v) => ({ ...v, [id]: partial }));
       await request(
         "/prompt/stream",
-        { sessionId: id, message: text },
+        {
+          sessionId: id,
+          message: text,
+          mode: composerMode,
+          permissionMode: composerPermission,
+          attachments: selectedAttachments.map((file) => file.path),
+        },
         (event) => {
           if (event.type === "accepted")
             setDrafts((d) => ({ ...d, [id]: "", [selectedId]: "" }));
+          if (event.type === "accepted")
+            setAttachments((files) => ({
+              ...files,
+              [id]: [],
+              [selectedId || "new"]: [],
+            }));
           if (event.type === "approval_request")
             setApprovals((v) => [
               ...v.filter((a) => a.requestId !== event.requestId),
@@ -627,41 +694,21 @@ export function Workbench() {
                   {model || "选择模型"}
                   <ChevronDown size={12} />
                 </button>
-                <select
-                  aria-label="执行模式"
-                  disabled={busy}
-                  value={current?.mode || "act"}
-                  onChange={(e) =>
-                    act(() => updateConversation({ mode: e.target.value }))
-                  }
-                >
-                  <option value="act">执行</option>
-                  <option value="plan">计划</option>
-                </select>
-                <select
-                  aria-label="权限"
-                  disabled={busy || current?.type === "chat"}
-                  value={current?.permissionMode || "read-only"}
-                  onChange={(e) =>
-                    act(() =>
-                      updateConversation({ permissionMode: e.target.value }),
-                    )
-                  }
-                >
-                  <option value="read-only">只读</option>
-                  <option value="workspace-write">工作区写入</option>
-                </select>
                 <button
                   type="button"
                   data-trigger
-                  className={autoApprove ? "active" : ""}
-                  title="自动审批：开启后不再逐个确认"
-                  aria-pressed={autoApprove}
-                  onClick={() => void toggleAutoApprove()}
+                  className={layer?.kind === "composer-options" ? "active" : ""}
+                  aria-label="更多选项"
+                  title="更多选项"
+                  onClick={() => setLayer({ kind: "composer-options" })}
                 >
-                  <ShieldCheck size={13} />
-                  {autoApprove ? "自动" : "手动"}
+                  <Plus size={16} />
                 </button>
+                {selectedAttachments.length > 0 && (
+                  <span className="attachment-count" title="已添加文件">
+                    <Paperclip size={12} /> {selectedAttachments.length}
+                  </span>
+                )}
                 <div className="composer-spacer" />
                 {busy ? (
                   <button
@@ -686,6 +733,73 @@ export function Workbench() {
                 )}
               </div>
             </form>
+            {layer?.kind === "composer-options" && (
+              <div className="composer-options" data-layer>
+                <label>
+                  模式
+                  <select
+                    aria-label="模式"
+                    disabled={busy}
+                    value={composerMode}
+                    onChange={(e) =>
+                      changeComposerMode(e.target.value as "act" | "plan")
+                    }
+                  >
+                    <option value="act">执行</option>
+                    <option value="plan">计划</option>
+                  </select>
+                </label>
+                <label>
+                  文件权限
+                  <select
+                    aria-label="文件权限"
+                    disabled={busy || current?.type === "chat"}
+                    value={composerPermission}
+                    onChange={(e) =>
+                      changeComposerPermission(
+                        e.target.value as "read-only" | "workspace-write",
+                      )
+                    }
+                  >
+                    <option value="read-only">仅查看</option>
+                    <option value="workspace-write">允许修改</option>
+                  </select>
+                </label>
+                <button type="button" onClick={() => void act(addAttachments)}>
+                  <Paperclip size={14} /> 添加文件
+                </button>
+                <button
+                  type="button"
+                  className={autoApprove ? "active" : ""}
+                  aria-pressed={autoApprove}
+                  onClick={() => void toggleAutoApprove()}
+                >
+                  <ShieldCheck size={13} />
+                  {autoApprove ? "自动审批已开" : "需要逐项审批"}
+                </button>
+                {selectedAttachments.length > 0 && (
+                  <div className="attachment-list">
+                    {selectedAttachments.map((file) => (
+                      <button
+                        type="button"
+                        key={file.path}
+                        title={`移除 ${file.name}`}
+                        onClick={() =>
+                          setAttachments((previous) => ({
+                            ...previous,
+                            [selectedId || "new"]: (
+                              previous[selectedId || "new"] || []
+                            ).filter((item) => item.path !== file.path),
+                          }))
+                        }
+                      >
+                        {file.name} ×
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="inspect-tools">
               <button
                 className={right === "composition" ? "active" : ""}

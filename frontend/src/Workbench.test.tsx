@@ -35,6 +35,11 @@ describe("goal-first workbench", () => {
     const { unmount } = render(<Workbench />);
     await waitFor(() => expect(request).toHaveBeenCalledWith("/resources"));
     expect(screen.getByPlaceholderText("你想做什么？")).toBeDefined();
+    expect(screen.queryByRole("combobox", { name: "执行模式" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "更多选项" }));
+    expect(screen.getByRole("combobox", { name: "模式" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "添加文件" })).toBeDefined();
+    fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByLabelText("资源库")).toBeNull();
     const toggle = screen.getByRole("button", { name: "资源与能力" });
     fireEvent.click(toggle);

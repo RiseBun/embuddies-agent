@@ -121,4 +121,32 @@ describe("workbench interactions", () => {
     );
     expect(el.scrollTop).toBe(1200);
   });
+
+  it("shows the persistent running status until the run completes", () => {
+    const turn = {
+      runId: "running",
+      message: "检查项目",
+      reply: "",
+      events: [],
+      status: "running",
+    };
+    const { rerender } = render(
+      <Messages
+        id="c"
+        turns={[turn]}
+        onRun={() => {}}
+        onCopy={() => {}}
+      />,
+    );
+    expect(screen.getByRole("status").textContent).toContain("embuddies正在运行");
+    rerender(
+      <Messages
+        id="c"
+        turns={[{ ...turn, status: "completed", reply: "完成" }]}
+        onRun={() => {}}
+        onCopy={() => {}}
+      />,
+    );
+    expect(screen.queryByRole("status")).toBeNull();
+  });
 });

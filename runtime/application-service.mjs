@@ -262,8 +262,32 @@ async function handlePromptStream(request, response) {
   let sessionId = "";
   let runId = "";
   try {
+    async function readPromptAttachments(values) {
+      if (!Array.isArray(values) || values.length === 0) return "";
+      const paths = [...new Set(values)]
+        .filter((value) => typeof value === "string" && value.trim())
+        .slice(0, 8);
+      const parts = [];
+      let total = 0;
+      for (const filePath of paths) {
+        const target = path.resolve(filePath);
+        const stat = await fs.promises.stat(target).catch(() => null);
+        if (!stat?.isFile())
+          throw new Error(`附件无法读取：${path.basename(target)}`);
+        if (stat.size > 256 * 1024)
+          throw new Error(`附件过大：${path.basename(target)}`);
+        total += stat.size;
+        if (total > 1024 * 1024) throw new Error("附件总大小不能超过 1 MB");
+        const content = await fs.promises.readFile(target, "utf8");
+        parts.push(`### ${path.basename(target)}\n${content}`);
+      }
+      return parts.length
+        ? `\n\n用户附加了以下文件，请将其作为本轮上下文：\n${parts.join("\n\n")}`
+        : "";
+    }
     const body = await readJson(request);
     const message = typeof body.message === "string" ? body.message.trim() : "";
+    const attachmentContext = await readPromptAttachments(body.attachments);
     sessionId =
       typeof body.sessionId === "string" &&
       /^[a-zA-Z0-9._-]{3,120}$/.test(body.sessionId)
@@ -451,32 +475,35 @@ async function handlePromptStream(request, response) {
 
       const profile = await profileStore.read();
       const preferences = await preferencesStore.read();
-      const result = await engine.run(`${modePrompt}${message}`, {
-        sessionId,
-        runId,
-        workspace,
-        permissionMode,
-        channel,
-        profile,
-        autoApprove: preferences.autoApprove,
-        sandboxMode: preferences.sandboxMode,
-        agents: runtimeContext.agents || [],
-        skills: runtimeContext.skills || [],
-        history,
-        resourceSnapshots: runtimeContext.resourceSnapshots || [],
-        browserSessionId: conversation.workspaceId || sessionId,
-        recoveryEvents:
-          conversation.turns?.at(-1)?.status === "interrupted"
-            ? conversation.turns.at(-1).events || []
-            : [],
-        onNotification(notification) {
-          const event = normalizeRuntimeEvent(notification);
-          if (!event) return;
-          if (database) database.appendEvent(runId, event);
-          collected.push(event);
-          sendStreamEvent(response, event);
+      const result = await engine.run(
+        `${modePrompt}${message}${attachmentContext}`,
+        {
+          sessionId,
+          runId,
+          workspace,
+          permissionMode,
+          channel,
+          profile,
+          autoApprove: preferences.autoApprove,
+          sandboxMode: preferences.sandboxMode,
+          agents: runtimeContext.agents || [],
+          skills: runtimeContext.skills || [],
+          history,
+          resourceSnapshots: runtimeContext.resourceSnapshots || [],
+          browserSessionId: conversation.workspaceId || sessionId,
+          recoveryEvents:
+            conversation.turns?.at(-1)?.status === "interrupted"
+              ? conversation.turns.at(-1).events || []
+              : [],
+          onNotification(notification) {
+            const event = normalizeRuntimeEvent(notification);
+            if (!event) return;
+            if (database) database.appendEvent(runId, event);
+            collected.push(event);
+            sendStreamEvent(response, event);
+          },
         },
-      });
+      );
       runtimeState = "idle";
       const reply = (result.finalResponse || "").trim();
       const nativeExecution = {
@@ -516,6 +543,14 @@ async function handlePromptStream(request, response) {
       });
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
+      const toolTimedOut = collected.some(
+        (event) =>
+          event.type === "tool_end" &&
+          event.failed === true &&
+          /超时|timed out|timeout/i.test(String(event.detail || "")),
+      );
+      if (toolTimedOut && /模型服务响应中断/.test(lastError))
+        lastError = "工具执行超时，模型未能继续，历史记录已保留";
       const stopped = lastError === "任务已停止";
       const interrupted = error.code === "NATIVE_DISCONNECTED";
       runtimeState = "idle";

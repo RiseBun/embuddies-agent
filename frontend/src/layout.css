@@ -443,6 +443,14 @@
   color: var(--muted);
   font-size: 12px;
 }
+.running-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0 45px;
+  color: #8a929a;
+  font-size: 11px;
+}
 .process {
   font-size: 11px;
   color: var(--muted);
@@ -501,6 +509,7 @@
   padding: 0;
 }
 .composer-wrap {
+  position: relative;
   padding: 8px 25px 12px;
   width: min(100%, 820px);
   align-self: center;
@@ -548,6 +557,60 @@
   max-width: 119px;
   padding: 3px;
   background: transparent;
+}
+.composer-options {
+  position: absolute;
+  bottom: 78px;
+  left: 25px;
+  z-index: 40;
+  width: 220px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  box-shadow: 0 8px 24px #24333a14;
+}
+.composer-options label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.composer-options select {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--text);
+  max-width: 112px;
+}
+.composer-options > button {
+  justify-content: flex-start;
+  color: #286c62;
+}
+.attachment-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.attachment-list button {
+  min-height: 24px;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  background: var(--surface);
+  font-size: 10px;
 }
 .composer-spacer {
   flex: 1;
