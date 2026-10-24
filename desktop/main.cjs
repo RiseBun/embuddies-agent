@@ -16,6 +16,7 @@ const {
 } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
+const { spawn } = require("node:child_process");
 const { pathToFileURL } = require("node:url");
 const { RuntimeSupervisor } = require("./runtime-supervisor.cjs");
 const { createRedactor } = require("./diagnostics.cjs");
@@ -160,6 +161,29 @@ async function browserRequest({ action, sessionId, args = [] }) {
     return browserRuntime.command({ ...args[0], workspaceId: sessionId }, true);
   throw new Error("未启用的浏览器操作");
 }
+// 自改进应用后重建前端并刷新窗口；仅开发版有源码与构建依赖时可用。
+function runFrontendBuild() {
+  const frontend = path.join(bundleRoot, "frontend");
+  const tsc = path.join(frontend, "node_modules", "typescript", "bin", "tsc");
+  const vite = path.join(frontend, "node_modules", "vite", "bin", "vite.js");
+  if (!fs.existsSync(tsc) || !fs.existsSync(vite))
+    return Promise.reject(new Error("当前版本缺少前端构建依赖，无法重建界面"));
+  const run = (args) =>
+    new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, args, {
+        cwd: frontend,
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+        windowsHide: true,
+        stdio: "ignore",
+      });
+      child.on("error", reject);
+      child.on("exit", (code) =>
+        code === 0 ? resolve() : reject(new Error(`前端构建失败（${code}）`)),
+      );
+    });
+  return run([tsc, "--noEmit"]).then(() => run([vite, "build"]));
+}
+
 async function hostRequest(operation, values) {
   if (operation === "crypto") {
     if (!safeStorage.isEncryptionAvailable())
@@ -507,6 +531,10 @@ ipcMain.handle("embuddies:host", async (event, method, values) => {
     case "window.unmaximize":
       win.unmaximize();
       return null;
+    case "app.rebuildAndReload":
+      await runFrontendBuild();
+      win.webContents.reload();
+      return { ok: true };
     default:
       throw new Error(`不支持的窗口操作：${method}`);
   }

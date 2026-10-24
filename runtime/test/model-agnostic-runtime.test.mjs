@@ -228,3 +228,308 @@ test("Anthropic streaming assembles the reply", async (t) => {
   );
   await runtime.close();
 });
+
+test("todo_write emits a todo event and is not a write tool", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "embuddies-todo-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+
+  const originalFetch = globalThis.fetch;
+  let round = 0;
+  globalThis.fetch = async () => {
+    round += 1;
+    if (round === 1)
+      return toolStream("todo_write", {
+        todos: [
+          { step: "读取文件", status: "in_progress" },
+          { step: "修改文件", status: "pending" },
+        ],
+      });
+    return textStream("ok");
+  };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const broker = {
+    wait: () => new Promise(() => {}),
+    observe: () => {},
+  };
+  const runtime = new EmbuddiesRuntime({}, { approvalBroker: broker });
+  const result = await runtime.run("列步骤", {
+    sessionId: "todo-1",
+    workspace: root,
+    channel: {
+      api: "openai-completions",
+      baseURL: "https://example.com/v1",
+      apiKey: "test",
+      model: "test-model",
+    },
+  });
+
+  const todo = result.events.find((e) => e.type === "todo");
+  assert.ok(todo, "should emit a todo event");
+  assert.equal(todo.todos.length, 2);
+  assert.equal(todo.todos[0].status, "in_progress");
+  await runtime.close();
+});
+
+test("subagent runs a nested task and returns its result", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "embuddies-sub-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+
+  const originalFetch = globalThis.fetch;
+  let round = 0;
+  globalThis.fetch = async () => {
+    round += 1;
+    if (round === 1)
+      return toolStream("subagent", { prompt: "分析一下这个任务" });
+    if (round === 2) return textStream("子代理的结论");
+    return textStream("收到：子代理的结论");
+  };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const runtime = new EmbuddiesRuntime({}, {});
+  const result = await runtime.run("做个任务", {
+    sessionId: "sub-1",
+    workspace: root,
+    channel: {
+      api: "openai-completions",
+      baseURL: "https://example.com/v1",
+      apiKey: "test",
+      model: "test-model",
+    },
+  });
+
+  assert.equal(result.finalResponse, "收到：子代理的结论");
+  assert.ok(round >= 3, "parent + subagent + parent should call the model");
+  await runtime.close();
+});
+
+test("job_start runs a background task and job_status reports it", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "embuddies-job-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => textStream("job output");
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const runtime = new EmbuddiesRuntime({}, {});
+  const emit = () => {};
+  const context = {
+    workspace: root,
+    sessionId: "s-job",
+    channel: {
+      api: "openai-completions",
+      baseURL: "https://example.com/v1",
+      apiKey: "t",
+      model: "m",
+    },
+    signal: new AbortController().signal,
+    callId: "c1",
+    permissionMode: "workspace-write",
+    browserSessionId: "",
+    sandboxMode: "standard",
+    emit,
+  };
+
+  const started = JSON.parse(
+    await runtime.invokeTool("job_start", { prompt: "做一个任务" }, context, emit),
+  );
+  assert.equal(started.status, "running");
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const status = JSON.parse(
+    await runtime.invokeTool(
+      "job_status",
+      { id: started.id },
+      context,
+      emit,
+    ),
+  );
+  assert.equal(status.status, "completed");
+  assert.equal(status.output, "job output");
+  await runtime.close();
+});
+
+test("parallel runs multiple sub-tasks and returns all results", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "embuddies-par-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+
+  const originalFetch = globalThis.fetch;
+  const outputs = ["结果A", "结果B"];
+  let call = 0;
+  globalThis.fetch = async () => textStream(outputs[call++ % outputs.length]);
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const runtime = new EmbuddiesRuntime({}, {});
+  const emit = () => {};
+  const context = {
+    workspace: root,
+    sessionId: "s-par",
+    channel: {
+      api: "openai-completions",
+      baseURL: "https://example.com/v1",
+      apiKey: "t",
+      model: "m",
+    },
+    signal: new AbortController().signal,
+    callId: "c1",
+    permissionMode: "workspace-write",
+    browserSessionId: "",
+    sandboxMode: "standard",
+    emit,
+  };
+
+  const raw = await runtime.invokeTool(
+    "parallel",
+    { tasks: [{ prompt: "任务A" }, { prompt: "任务B" }] },
+    context,
+    emit,
+  );
+  const results = JSON.parse(raw);
+  assert.equal(results.length, 2);
+  assert.ok(results.every((item) => typeof item.output === "string"));
+  assert.equal(new Set(results.map((item) => item.output)).size, 2);
+  await runtime.close();
+});
+
+test("workflow runs a JS orchestration script", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "embuddies-wf-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+
+  const originalFetch = globalThis.fetch;
+  let call = 0;
+  globalThis.fetch = async () => textStream(`结果${++call}`);
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const runtime = new EmbuddiesRuntime({}, {});
+  const context = {
+    workspace: root,
+    sessionId: "s-wf",
+    channel: {
+      api: "openai-completions",
+      baseURL: "https://example.com/v1",
+      apiKey: "t",
+      model: "m",
+    },
+    signal: new AbortController().signal,
+    callId: "c1",
+    permissionMode: "workspace-write",
+    browserSessionId: "",
+    sandboxMode: "standard",
+    emit: () => {},
+  };
+
+  const raw = await runtime.invokeTool(
+    "workflow",
+    {
+      script:
+        "phase('开始');\nconst a = await agent('任务A');\nconst b = await agent('任务B');\nlog('完成');\nreturn [a, b];",
+    },
+    context,
+    () => {},
+  );
+  const parsed = JSON.parse(raw);
+  assert.equal(parsed.result.length, 2);
+  assert.ok(parsed.result.every((item) => typeof item === "string"));
+  assert.ok(parsed.logs.some((line) => line.includes("开始")));
+  await runtime.close();
+});
+
+test("runtime exposes resource agents as tools and injects skills", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "embuddies-skills-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+
+  const bodies = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, options) => {
+    bodies.push(JSON.parse(options.body));
+    return textStream("ok");
+  };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const runtime = new EmbuddiesRuntime({}, {});
+  await runtime.run("你好", {
+    sessionId: "sk-1",
+    workspace: root,
+    channel: {
+      api: "openai-completions",
+      baseURL: "https://example.com/v1",
+      apiKey: "t",
+      model: "m",
+    },
+    agents: [
+      {
+        resourceId: "r1",
+        toolName: "agent_review",
+        name: "Review",
+        description: "检查风险",
+        instructions: "检查改动",
+      },
+    ],
+    skills: [{ name: "规则A", content: "先检查再修改。" }],
+  });
+
+  const body = bodies[0];
+  assert.ok(
+    body.messages[0].content.includes("先检查再修改"),
+    "skill content should be injected into the system prompt",
+  );
+  assert.ok(
+    body.tools.some((tool) => tool.function.name === "agent_review"),
+    "resource agent should be callable as a tool",
+  );
+  await runtime.close();
+});
+
+test("autoApprove lets a write tool run without waiting for a decision", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "embuddies-auto-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+
+  const originalFetch = globalThis.fetch;
+  let round = 0;
+  globalThis.fetch = async () => {
+    round += 1;
+    if (round === 1)
+      return toolStream("write_file", { path: "auto.txt", content: "hi" });
+    return textStream("done");
+  };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  // 如果被咨询，这个 broker 会一直挂起；自动审批必须绕过它。
+  const broker = {
+    wait: () => new Promise(() => {}),
+    observe: () => {},
+  };
+  const runtime = new EmbuddiesRuntime({}, { approvalBroker: broker });
+  const result = await runtime.run("写个文件", {
+    sessionId: "auto-1",
+    workspace: root,
+    channel: {
+      api: "openai-completions",
+      baseURL: "https://example.com/v1",
+      apiKey: "test",
+      model: "test-model",
+    },
+    autoApprove: true,
+  });
+
+  assert.equal(result.finalResponse, "done");
+  assert.equal(
+    await fs.readFile(path.join(root, "auto.txt"), "utf8"),
+    "hi",
+    "the write should have been approved automatically",
+  );
+  await runtime.close();
+});

@@ -1178,6 +1178,24 @@ export function createResourceStore(
         selection,
         matches,
       })),
+      // Callable resource agents (type=agent) and injectable work rules (type=skill).
+      agents: resources
+        .filter(({ resource }) => resource.type === "agent")
+        .map(({ resource }) => ({
+          resourceId: resource.id,
+          toolName:
+            "agent_" +
+            resource.id.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 40),
+          name: resource.name,
+          description: `调用专用 Agent：${resource.name}`,
+          instructions: resource.content || "",
+        })),
+      skills: resources
+        .filter(({ resource }) => resource.type === "skill")
+        .map(({ resource }) => ({
+          name: resource.name,
+          content: resource.content || "",
+        })),
     };
   }
 

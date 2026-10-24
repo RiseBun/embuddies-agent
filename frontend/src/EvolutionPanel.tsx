@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Pause, Play, RefreshCw, Sparkles, X } from "lucide-react";
 import { Dialog } from "./Forms";
-import { request } from "./api";
+import { host, request } from "./api";
 import type { Json } from "./types";
 
 export function EvolutionPanel({
@@ -65,7 +65,10 @@ export function EvolutionPanel({
     try {
       await request("/self-improve/decide", { id, decision });
       await load();
-      if (decision === "apply") await onApplied?.();
+      if (decision === "apply") {
+        await onApplied?.();
+        await host("app.rebuildAndReload");
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -92,17 +95,12 @@ export function EvolutionPanel({
     <Dialog title="自进化" onClose={onClose} className="evolution-dialog">
       <div className="evolution-panel">
         <div className="evolution-toolbar">
-          <p>提出改进，查看证据，由你决定是否应用。</p>
           <button disabled={!loaded || busy} onClick={toggleFrozen}>
             {frozen ? <Play size={14} /> : <Pause size={14} />}
-            {frozen ? "恢复自进化" : "冻结自进化"}
+            {frozen ? "恢复" : "冻结"}
           </button>
         </div>
-        {frozen && (
-          <p role="status">
-            自进化已冻结。可以查看、拒绝提案，恢复后才能生成或应用。
-          </p>
-        )}
+        {frozen && <p className="evolution-hint">已冻结</p>}
         <label className="evolution-intent">
           <span>改进意图</span>
           <textarea
@@ -119,14 +117,9 @@ export function EvolutionPanel({
           onClick={start}
         >
           <Sparkles size={14} />
-          {running ? "正在生成提案…" : "生成改进提案"}
+          {running ? "生成中…" : "生成提案"}
         </button>
-        {running && (
-          <p role="status">
-            正在隔离副本中改进：{run.intent}
-            。关闭面板后仍会继续，重新打开可查看结果。
-          </p>
-        )}
+        {running && <p className="evolution-hint">正在改进：{run.intent}</p>}
         {run?.status === "failed" && (
           <p className="error-line" role="alert">
             {run.error}
@@ -138,7 +131,7 @@ export function EvolutionPanel({
           </p>
         )}
         <div className="evolution-toolbar">
-          <h3>改进记录</h3>
+          <h3>提案</h3>
           <button
             onClick={() => load().catch((e) => setError((e as Error).message))}
             aria-label="刷新提案"
@@ -148,11 +141,9 @@ export function EvolutionPanel({
           </button>
         </div>
         <div className="evolution-list">
-          {!loaded && <p className="empty-line">正在读取提案…</p>}
+          {!loaded && <p className="empty-line">读取中…</p>}
           {loaded && !proposals.length && (
-            <p className="empty-line">
-              还没有提案。在上方描述想改进的地方，生成后先查看改动再决定。
-            </p>
+            <p className="empty-line">还没有提案</p>
           )}
           {proposals.map((p) => {
             const canApply =
@@ -203,12 +194,9 @@ export function EvolutionPanel({
                 )}
                 <details className="evolution-evidence">
                   <summary>
-                    基础检查{p.evidence?.ok ? "通过" : "未通过"} · 查看证据
+                    证据 · {p.evidence?.ok ? "通过" : "未通过"}
                   </summary>
-                  <p>
-                    当前只检查 JavaScript
-                    语法和差异空白，不代表完整测试、类型检查或构建通过。
-                  </p>
+                  <p>仅基础检查（语法与空白）</p>
                   <ul>
                     <li>
                       差异空白：{p.evidence?.whitespaceOk ? "通过" : "未通过"}

@@ -167,7 +167,8 @@ try {
     async () =>
       (await window.EMBUDDIES_DESKTOP.runtimeStatus()).state === "ready",
   );
-  await panel.getByRole("button", { name: "自进化", exact: true }).click();
+  await panel.getByRole("button", { name: "全局设置", exact: true }).click();
+  await panel.getByRole("button", { name: "应用改进", exact: true }).click();
   await panel.getByRole("dialog", { name: "自进化", exact: true }).waitFor();
   report.cases.push(
     "double-click-opens-workbench-with-ready-runtime-and-evolution-panel",

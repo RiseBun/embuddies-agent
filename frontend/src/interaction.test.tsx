@@ -82,7 +82,13 @@ describe("workbench interactions", () => {
       status: "running" as const,
     };
     const { container, rerender } = render(
-      <Messages id="c" turns={[old]} live={live} onRun={() => {}} />,
+      <Messages
+        id="c"
+        turns={[old]}
+        live={live}
+        onRun={() => {}}
+        onCopy={() => {}}
+      />,
     );
     const el = container.querySelector(".message-scroll") as HTMLElement;
     Object.defineProperties(el, {
@@ -97,6 +103,7 @@ describe("workbench interactions", () => {
         turns={[old]}
         live={{ ...live, reply: "回复正在更新" }}
         onRun={() => {}}
+        onCopy={() => {}}
       />,
     );
     expect(el.scrollTop).toBe(120);
@@ -109,6 +116,7 @@ describe("workbench interactions", () => {
         turns={[old]}
         live={{ ...live, reply: "回复完成" }}
         onRun={() => {}}
+        onCopy={() => {}}
       />,
     );
     expect(el.scrollTop).toBe(1200);

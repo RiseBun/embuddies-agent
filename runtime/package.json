@@ -34,6 +34,7 @@
     "verify:channel-live": "node scripts/verify-embuddies-runtime.mjs",
     "verify:auth": "node scripts/verify-api-auth.mjs",
     "test": "node --test --test-isolation=none test/*.test.mjs",
+    "eval:behavior": "node evals/behavior.mjs",
     "coverage": "node --experimental-test-coverage --test --test-isolation=none test/*.test.mjs",
     "lint": "eslint . && cd .. && node runtime/node_modules/eslint/bin/eslint.js desktop/*.cjs --config runtime/eslint.config.js",
     "format": "prettier --write \"*.mjs\" \"scripts/*.mjs\" \"test/*.mjs\" \"../shell/resources/js/{agent-client,channel-controller,icons,local-store,main,markdown-renderer,panel-controller,panel-state,pet-controller,run-activity}.js\" \"../shell/resources/*.{html,css}\"",

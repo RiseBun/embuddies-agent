@@ -137,11 +137,39 @@ export function Inspector({
           </div>
         ) : right === "diff" ? (
           <div className="panel-content">
-            <pre className="diff">
-              {(live?.events || run?.result?.events || []).findLast(
-                (e: Json) => e.type === "file_diff",
-              )?.diff || "本次任务没有文件变化"}
-            </pre>
+            {(() => {
+              const events = live?.events || run?.result?.events || [];
+              const diffs = events.filter((e: Json) => e.type === "file_diff");
+              if (!diffs.length)
+                return <p className="empty-line">本次任务没有文件变化</p>;
+              return diffs.map((e: Json, index: number) => (
+                <details
+                  className="file-diff"
+                  key={`${e.path}-${index}`}
+                  open={diffs.length === 1}
+                >
+                  <summary>{e.path}</summary>
+                  <pre className="diff">
+                    {String(e.diff || "")
+                      .split("\n")
+                      .map((line, lineIndex) => (
+                        <div
+                          key={lineIndex}
+                          className={
+                            line.startsWith("+")
+                              ? "diff-add"
+                              : line.startsWith("-")
+                                ? "diff-remove"
+                                : "diff-context"
+                          }
+                        >
+                          {line || " "}
+                        </div>
+                      ))}
+                  </pre>
+                </details>
+              ));
+            })()}
           </div>
         ) : (
           <div className="panel-content">

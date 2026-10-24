@@ -13,6 +13,10 @@ import { EmbuddiesRuntimePool } from "./embuddies-runtime-pool.mjs";
 import { EmbuddiesRuntime } from "./embuddies-runtime.mjs";
 import { createApprovalBroker } from "./approval-broker.mjs";
 import { createSelfImproveService } from "./self-improve-service.mjs";
+import { createPreferencesStore } from "./preferences.mjs";
+import { publicPresets } from "./model-presets.mjs";
+import { createProfileStore } from "./profile-store.mjs";
+import { compactHistory, formatTurn } from "./context-compression.mjs";
 import { normalizeRuntimeEvent } from "./event-normalizer.mjs";
 import { assistantOutput } from "./assistant-output.mjs";
 import { pickWindowsFolder } from "./folder-picker.mjs";
@@ -97,6 +101,8 @@ const engine = new EmbuddiesRuntimePool(configStore, {
 });
 // Keep ordinary chat/native capabilities out of the file-only evolution runtime.
 const selfImprove = createSelfImproveService({ configStore, dataRoot });
+const preferencesStore = createPreferencesStore(dataRoot);
+const profileStore = createProfileStore(dataRoot);
 
 let runtimeState = "starting";
 let lastError = null;
@@ -405,25 +411,57 @@ async function handlePromptStream(request, response) {
       const priorTurns = Array.isArray(conversation.turns)
         ? conversation.turns
         : [];
-      // 将已持久化对话注入当前请求，运行层负责上下文压缩。
-      const history = priorTurns
-        .map((turn, index) => {
-          const user = String(turn.message || "").trim();
-          const reply = String(turn.reply || "").trim();
-          const ledger =
-            turn.status === "interrupted"
-              ? `\n[中断的执行记录] ${JSON.stringify(turn.events || [])}\n恢复要求：先检查已执行操作的当前结果；不要重复执行已经完成的文件修改、命令或网页操作。`
-              : "";
-          return `第${index + 1}轮：\n用户：${user}\n助手：${reply}${ledger}`;
-        })
-        .join("\n\n");
+      // 把较早的轮次滚动压缩成持久摘要，避免长对话撑爆上下文。
+      let summary =
+        typeof conversation.summary === "string" ? conversation.summary : "";
+      let summaryUpTo = Number.isInteger(conversation.summaryUpTo)
+        ? conversation.summaryUpTo
+        : 0;
+      if (priorTurns.length - summaryUpTo > 16) {
+        const pending = priorTurns.slice(summaryUpTo, priorTurns.length - 8);
+        if (pending.length) {
+          try {
+            const slice = pending
+              .map((turn, index) => formatTurn(turn, summaryUpTo + index))
+              .join("\n\n");
+            const next = await engine.summarize(
+              summary ? `${summary}\n\n${slice}` : slice,
+              channel,
+            );
+            if (typeof next === "string" && next.trim()) {
+              summary = next.trim().slice(0, 8000);
+              summaryUpTo += pending.length;
+              await conversationStore.update(sessionId, {
+                summary,
+                summaryUpTo,
+              });
+            }
+          } catch {
+            // 摘要失败时回退到截断
+          }
+        }
+      }
+      const historyParts = [];
+      if (summary) historyParts.push(`[较早对话摘要]\n${summary}`);
+      for (let index = summaryUpTo; index < priorTurns.length; index += 1)
+        historyParts.push(formatTurn(priorTurns[index], index));
+      const rawHistory = historyParts.join("\n\n");
+      const history =
+        rawHistory.length > 48_000 ? compactHistory(priorTurns) : rawHistory;
 
+      const profile = await profileStore.read();
+      const preferences = await preferencesStore.read();
       const result = await engine.run(`${modePrompt}${message}`, {
         sessionId,
         runId,
         workspace,
         permissionMode,
         channel,
+        profile,
+        autoApprove: preferences.autoApprove,
+        sandboxMode: preferences.sandboxMode,
+        agents: runtimeContext.agents || [],
+        skills: runtimeContext.skills || [],
         history,
         resourceSnapshots: runtimeContext.resourceSnapshots || [],
         browserSessionId: conversation.workspaceId || sessionId,
@@ -1108,6 +1146,33 @@ async function handleSelfImproveDecide(request, response) {
   sendJson(response, 200, { ok: true, ...result });
 }
 
+async function handlePreferencesRead(_request, response) {
+  sendJson(response, 200, {
+    ok: true,
+    preferences: await preferencesStore.read(),
+  });
+}
+
+async function handlePreferencesUpdate(request, response) {
+  const body = await readJson(request);
+  sendJson(response, 200, {
+    ok: true,
+    preferences: await preferencesStore.update(body),
+  });
+}
+
+async function handleProfileRead(_request, response) {
+  sendJson(response, 200, { ok: true, profile: await profileStore.read() });
+}
+
+async function handleProfileUpdate(request, response) {
+  const body = await readJson(request);
+  sendJson(response, 200, {
+    ok: true,
+    profile: await profileStore.update(body),
+  });
+}
+
 export async function handleApplicationRequest(request, response) {
   try {
     const origin = request.headers.origin;
@@ -1149,6 +1214,16 @@ export async function handleApplicationRequest(request, response) {
       return await handleSelfImproveDecide(request, response);
     if (request.method === "POST" && request.url === "/self-improve/freeze")
       return await handleSelfImproveFreeze(request, response);
+    if (request.method === "GET" && request.url === "/preferences")
+      return await handlePreferencesRead(request, response);
+    if (request.method === "POST" && request.url === "/preferences")
+      return await handlePreferencesUpdate(request, response);
+    if (request.method === "GET" && request.url === "/profile")
+      return await handleProfileRead(request, response);
+    if (request.method === "POST" && request.url === "/profile")
+      return await handleProfileUpdate(request, response);
+    if (request.method === "GET" && request.url === "/providers")
+      return sendJson(response, 200, { ok: true, presets: publicPresets() });
     if (request.method === "POST" && request.url === "/config")
       return await handleConfig(request, response);
     if (request.method === "POST" && request.url === "/config/test")
@@ -1274,7 +1349,7 @@ export async function invokeApplication(
 ) {
   if (
     typeof requestPath !== "string" ||
-    !/^\/(?:health|config|prompt|cancel|approvals?|conversations?|resources?|workspaces?|runs|follow-ups|dialogs|self-improve)(?:\/|\?|$)/.test(
+    !/^\/(?:health|config|prompt|cancel|approvals?|conversations?|resources?|workspaces?|runs|follow-ups|dialogs|self-improve|preferences|providers|profile)(?:\/|\?|$)/.test(
       requestPath,
     )
   )

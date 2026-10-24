@@ -396,6 +396,15 @@ export function createConversationStore(
         if (goal.length > 2000) throw new Error("目标过长");
         record.goal = goal;
       }
+      if (Object.hasOwn(patch, "summary")) {
+        const summary =
+          typeof patch.summary === "string" ? patch.summary.trim() : "";
+        record.summary = summary.slice(0, 8000);
+        record.summaryUpTo =
+          Number.isInteger(patch.summaryUpTo) && patch.summaryUpTo >= 0
+            ? patch.summaryUpTo
+            : record.summaryUpTo || 0;
+      }
       if (Object.hasOwn(patch, "channel"))
         record.channel = typeof patch.channel === "string" ? patch.channel : "";
       if (Object.hasOwn(patch, "model"))

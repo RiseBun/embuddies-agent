@@ -2,6 +2,7 @@ import { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { Workbench } from "./Workbench";
 import { Pet } from "./Brand";
+import { applyPreferences, loadPreferences } from "./preferences";
 import "./styles.css";
 class Boundary extends Component<{ children: ReactNode }, { error: string }> {
   state = { error: "" };
@@ -28,6 +29,7 @@ if (pet) {
   document.documentElement.classList.add("pet-window");
   document.body.classList.add("pet-window");
 }
+if (!pet) loadPreferences().then(applyPreferences).catch(() => {});
 createRoot(document.getElementById("root")!).render(
   <Boundary>{pet ? <Pet /> : <Workbench />}</Boundary>,
 );

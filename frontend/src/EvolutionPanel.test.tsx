@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EvolutionPanel } from "./EvolutionPanel";
 import { request } from "./api";
 
-vi.mock("./api", () => ({ request: vi.fn() }));
+vi.mock("./api", () => ({ request: vi.fn(), host: vi.fn() }));
 
 const proposal = {
   id: "p1",
@@ -39,7 +39,7 @@ describe("evolution review", () => {
     expect(
       screen.getByText(proposal.diff, { normalizer: (value) => value }),
     ).toBeDefined();
-    expect(screen.getByText(/不代表完整测试/)).toBeDefined();
+    expect(screen.getByText(/仅基础检查/)).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "应用改进" }));
     await waitFor(() =>
       expect(request).toHaveBeenCalledWith("/self-improve/decide", {
@@ -82,12 +82,12 @@ describe("evolution review", () => {
     fireEvent.change(screen.getByRole("textbox"), {
       target: { value: "添加 Skill" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "生成改进提案" }));
-    await screen.findByText(/关闭面板后仍会继续/);
+    fireEvent.click(screen.getByRole("button", { name: "生成提案" }));
+    await screen.findByText(/正在改进/);
     expect(
       (
         screen.getByRole("button", {
-          name: "正在生成提案…",
+          name: "生成中…",
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
@@ -102,7 +102,7 @@ describe("evolution review", () => {
       run: { status: "running", intent: "正在添加 Skill" },
     });
     render(<EvolutionPanel onClose={() => {}} />);
-    await screen.findByText(/正在隔离副本中改进/);
+    await screen.findByText(/正在改进/);
     expect((screen.getByRole("textbox") as HTMLTextAreaElement).disabled).toBe(
       true,
     );
@@ -114,7 +114,7 @@ describe("evolution review", () => {
       frozen: true,
     });
     render(<EvolutionPanel onClose={() => {}} />);
-    await screen.findByText(/自进化已冻结/);
+    await screen.findByText("已冻结");
     expect(
       (screen.getByRole("button", { name: "应用改进" }) as HTMLButtonElement)
         .disabled,
@@ -130,12 +130,12 @@ describe("evolution review", () => {
       expect(
         (
           screen.getByRole("button", {
-            name: "恢复自进化",
+            name: "恢复",
           }) as HTMLButtonElement
         ).disabled,
       ).toBe(false),
     );
-    fireEvent.click(screen.getByRole("button", { name: "恢复自进化" }));
+    fireEvent.click(screen.getByRole("button", { name: "恢复" }));
     await waitFor(() =>
       expect(request).toHaveBeenCalledWith("/self-improve/freeze", {
         frozen: false,
